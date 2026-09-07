@@ -316,26 +316,20 @@ export default function ReportDetailsScreen() {
             </Text>
           </View>
 
-          <View className="h-44 w-full rounded-2xl overflow-hidden border border-cardBorder">
-            <MapView
-              style={{ width: '100%', height: '100%' }}
-              scrollEnabled={false}
-              zoomEnabled={false}
-              region={{
-                latitude: report.location?.latitude || 23.0225,
-                longitude: report.location?.longitude || 72.5714,
-                latitudeDelta: 0.006,
-                longitudeDelta: 0.006
+          <View className="h-44 w-full rounded-2xl overflow-hidden border border-cardBorder bg-surfaceAlt relative">
+            <Image
+              source={{
+                uri: `https://staticmap.openstreetmap.de/staticmap.php?center=${report.location?.latitude || 23.0225},${report.location?.longitude || 72.5714}&zoom=16&size=600x300&markers=${report.location?.latitude || 23.0225},${report.location?.longitude || 72.5714},ol-marker`
               }}
-            >
-              <Marker
-                coordinate={{
-                  latitude: report.location?.latitude || 23.0225,
-                  longitude: report.location?.longitude || 72.5714
-                }}
-                pinColor="#F97316"
-              />
-            </MapView>
+              style={{ width: '100%', height: '100%' }}
+              resizeMode="cover"
+            />
+            <View className="absolute bottom-2.5 right-2.5 bg-surface/95 border border-cardBorder px-3 py-1.5 rounded-xl flex-row items-center shadow-sm">
+              <Ionicons name="navigate" size={12} color="#F97316" style={{ marginRight: 5 }} />
+              <Text className="text-textDark text-[11px] font-bold">
+                {parseFloat(report.location?.latitude || 23.0225).toFixed(4)}, {parseFloat(report.location?.longitude || 72.5714).toFixed(4)}
+              </Text>
+            </View>
           </View>
         </View>
 

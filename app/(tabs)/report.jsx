@@ -118,12 +118,20 @@ export default function ReportIssueScreen() {
   };
 
   const handleUseCurrentLocation = async () => {
-    const res = await getCurrentLocation();
-    if (res && res.coords) {
-      setLocation(res.coords);
-      setAddress(res.address);
-    } else {
-      Alert.alert('Location Error', 'Unable to fetch your current GPS position.');
+    try {
+      const res = await getCurrentLocation();
+      if (res && res.coords) {
+        setLocation(res.coords);
+        setAddress(res.address);
+      } else {
+        Alert.alert(
+          'Location Notice',
+          'Could not retrieve GPS position. Please ensure Location Services (GPS) and permissions are enabled on your device.'
+        );
+      }
+    } catch (e) {
+      console.error('Use current location error:', e.message);
+      Alert.alert('Location Notice', 'Could not retrieve GPS coordinates. Please try again or pick on map.');
     }
   };
 
@@ -432,20 +440,22 @@ export default function ReportIssueScreen() {
               ) : null}
 
               {location ? (
-                <View className="h-44 rounded-2xl overflow-hidden border border-cardBorder mt-1">
-                  <MapView
-                    style={{ width: '100%', height: '100%' }}
-                    region={{
-                      latitude: location.latitude,
-                      longitude: location.longitude,
-                      latitudeDelta: 0.005,
-                      longitudeDelta: 0.005
-                    }}
-                    scrollEnabled={false}
-                    zoomEnabled={false}
-                  >
-                    <Marker coordinate={location} pinColor="#F97316" />
-                  </MapView>
+                <View className="rounded-2xl overflow-hidden border border-cardBorder mt-2 bg-surface">
+                  <View className="h-44 w-full bg-surfaceAlt items-center justify-center relative">
+                    <Image
+                      source={{
+                        uri: `https://staticmap.openstreetmap.de/staticmap.php?center=${location.latitude},${location.longitude}&zoom=16&size=600x300&markers=${location.latitude},${location.longitude},ol-marker`
+                      }}
+                      style={{ width: '100%', height: '100%' }}
+                      resizeMode="cover"
+                    />
+                    <View className="absolute bottom-2.5 right-2.5 bg-surface/95 border border-cardBorder px-3 py-1.5 rounded-xl flex-row items-center shadow-sm">
+                      <Ionicons name="navigate" size={12} color="#F97316" style={{ marginRight: 5 }} />
+                      <Text className="text-textDark text-[11px] font-bold">
+                        {location.latitude.toFixed(4)}, {location.longitude.toFixed(4)}
+                      </Text>
+                    </View>
+                  </View>
                 </View>
               ) : null}
             </View>

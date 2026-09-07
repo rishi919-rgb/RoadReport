@@ -32,7 +32,15 @@ const useLocation = () => {
     setLoading(true);
     setError(null);
     try {
-      // 1. Request foreground location permissions from the OS
+      // 1. Verify if device location services (GPS) are toggled ON
+      const servicesEnabled = await Location.hasServicesEnabledAsync();
+      if (!servicesEnabled) {
+        setError('Device location services (GPS) are turned off');
+        setLoading(false);
+        return null;
+      }
+
+      // 2. Request foreground location permissions from the OS
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
         setError('Location permission was denied by the user');
@@ -40,40 +48,63 @@ const useLocation = () => {
         return null;
       }
 
-      // 2. Fetch the actual hardware GPS coordinates (high accuracy)
-      const currentPos = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced
-      });
+      // 3. Fetch current hardware GPS position with fallback to last known position
+      let coords = null;
+      try {
+        const currentPos = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+          timeInterval: 5000
+        });
+        if (currentPos && currentPos.coords) {
+          coords = {
+            latitude: currentPos.coords.latitude,
+            longitude: currentPos.coords.longitude
+          };
+        }
+      } catch (posErr) {
+        console.warn('getCurrentPositionAsync failed, attempting last known position:', posErr.message);
+        const lastPos = await Location.getLastKnownPositionAsync();
+        if (lastPos && lastPos.coords) {
+          coords = {
+            latitude: lastPos.coords.latitude,
+            longitude: lastPos.coords.longitude
+          };
+        }
+      }
 
-      const coords = {
-        latitude: currentPos.coords.latitude,
-        longitude: currentPos.coords.longitude
-      };
+      if (!coords) {
+        setError('Unable to acquire GPS coordinates');
+        setLoading(false);
+        return null;
+      }
+
       setLocation(coords);
 
-      // 3. Translate coordinates into human-readable text address via reverse geocoding
-      const geocode = await Location.reverseGeocodeAsync(coords);
-      
-      if (geocode && geocode.length > 0) {
-        const place = geocode[0];
-        // Combine address parts safely (avoiding empty fields)
-        const addressParts = [
-          place.name || place.streetNumber,
-          place.street,
-          place.district || place.subregion,
-          place.city,
-          place.region,
-          place.postalCode
-        ].filter(Boolean); // Filter out null/undefined/empty parts
+      // 4. Translate coordinates into human-readable address with graceful fallback
+      let formattedAddress = `GPS Location (${coords.latitude.toFixed(4)}, ${coords.longitude.toFixed(4)})`;
+      try {
+        const geocode = await Location.reverseGeocodeAsync(coords);
+        if (geocode && geocode.length > 0) {
+          const place = geocode[0];
+          const addressParts = [
+            place.name || place.streetNumber,
+            place.street,
+            place.district || place.subregion,
+            place.city,
+            place.region,
+            place.postalCode
+          ].filter(Boolean);
 
-        const formattedAddress = addressParts.join(', ');
-        setAddress(formattedAddress || 'Unknown Address');
-        
-        return { coords, address: formattedAddress };
-      } else {
-        setAddress('Address could not be determined');
-        return { coords, address: 'Address could not be determined' };
+          if (addressParts.length > 0) {
+            formattedAddress = addressParts.join(', ');
+          }
+        }
+      } catch (geoErr) {
+        console.warn('Reverse geocoding unavailable, using coordinate label:', geoErr.message);
       }
+
+      setAddress(formattedAddress);
+      return { coords, address: formattedAddress };
     } catch (err) {
       setError(err.message || 'Failed to retrieve location');
       console.error('Location Error:', err);
