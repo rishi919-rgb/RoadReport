@@ -29,6 +29,11 @@ app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/reports', reportRoutes);
 
+// Root endpoint purely to verify server health and prevent 404s when opening the base URL directly (useful for viva demos and uptime checks)
+app.get('/', (req, res) => {
+  res.send('RoadReport API is running 🚧');
+});
+
 // Simple health-check route to verify backend is running
 app.get('/health', (req, res) => {
   res.status(200).json({ success: true, message: 'RoadReport Backend API is active and healthy' });
