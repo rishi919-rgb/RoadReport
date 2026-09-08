@@ -9,7 +9,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
-import MapView, { Marker } from 'react-native-maps';
+import MiniMapPreview from '../../components/MiniMapPreview';
 
 import CategorySelector from '../../components/CategorySelector';
 import MediaPreview from '../../components/MediaPreview';
@@ -441,21 +441,11 @@ export default function ReportIssueScreen() {
 
               {location ? (
                 <View className="rounded-2xl overflow-hidden border border-cardBorder mt-2 bg-surface">
-                  <View className="h-44 w-full bg-surfaceAlt items-center justify-center relative">
-                    <Image
-                      source={{
-                        uri: `https://staticmap.openstreetmap.de/staticmap.php?center=${location.latitude},${location.longitude}&zoom=16&size=600x300&markers=${location.latitude},${location.longitude},ol-marker`
-                      }}
-                      style={{ width: '100%', height: '100%' }}
-                      resizeMode="cover"
-                    />
-                    <View className="absolute bottom-2.5 right-2.5 bg-surface/95 border border-cardBorder px-3 py-1.5 rounded-xl flex-row items-center shadow-sm">
-                      <Ionicons name="navigate" size={12} color="#F97316" style={{ marginRight: 5 }} />
-                      <Text className="text-textDark text-[11px] font-bold">
-                        {location.latitude.toFixed(4)}, {location.longitude.toFixed(4)}
-                      </Text>
-                    </View>
-                  </View>
+                  <MiniMapPreview
+                    latitude={location.latitude}
+                    longitude={location.longitude}
+                    height={176}
+                  />
                 </View>
               ) : null}
             </View>

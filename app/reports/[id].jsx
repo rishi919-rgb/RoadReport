@@ -7,8 +7,8 @@ import React, { useEffect, useState, useContext } from 'react';
 import { View, Text, ScrollView, Image, TouchableOpacity, Share, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import MapView, { Marker } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
+import MiniMapPreview from '../../components/MiniMapPreview';
 
 import { ReportContext } from '../../context/ReportContext';
 import reportService from '../../services/reportService';
@@ -316,21 +316,11 @@ export default function ReportDetailsScreen() {
             </Text>
           </View>
 
-          <View className="h-44 w-full rounded-2xl overflow-hidden border border-cardBorder bg-surfaceAlt relative">
-            <Image
-              source={{
-                uri: `https://staticmap.openstreetmap.de/staticmap.php?center=${report.location?.latitude || 23.0225},${report.location?.longitude || 72.5714}&zoom=16&size=600x300&markers=${report.location?.latitude || 23.0225},${report.location?.longitude || 72.5714},ol-marker`
-              }}
-              style={{ width: '100%', height: '100%' }}
-              resizeMode="cover"
-            />
-            <View className="absolute bottom-2.5 right-2.5 bg-surface/95 border border-cardBorder px-3 py-1.5 rounded-xl flex-row items-center shadow-sm">
-              <Ionicons name="navigate" size={12} color="#F97316" style={{ marginRight: 5 }} />
-              <Text className="text-textDark text-[11px] font-bold">
-                {parseFloat(report.location?.latitude || 23.0225).toFixed(4)}, {parseFloat(report.location?.longitude || 72.5714).toFixed(4)}
-              </Text>
-            </View>
-          </View>
+          <MiniMapPreview
+            latitude={report.location?.latitude}
+            longitude={report.location?.longitude}
+            height={176}
+          />
         </View>
 
         <TouchableOpacity

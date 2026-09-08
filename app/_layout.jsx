@@ -20,9 +20,17 @@ import { ReportProvider } from '../context/ReportContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import reportService from '../services/reportService';
 import * as SecureStore from 'expo-secure-store';
+import axios from 'axios';
 
 export default function RootLayout() {
   
+  // Non-blocking pre-warming ping to ensure Render container is spinning up immediately on app start
+  useEffect(() => {
+    axios.get('https://roadreport-plu6.onrender.com/health', { timeout: 45000 })
+      .then(() => console.log('Render backend pre-warmed successfully 🚀'))
+      .catch((err) => console.log('Pre-warming ping sent (server spinning up):', err.message));
+  }, []);
+
   // Attempt to sync offline report queue on application launch
   useEffect(() => {
     const syncOfflineQueue = async () => {

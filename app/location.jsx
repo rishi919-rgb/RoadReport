@@ -1,33 +1,33 @@
 /**
  * @file location.jsx
  * @description Full-screen map location picker screen - Warm Stone & Amber civic super-app design.
+ * Uses LeafletLocationPicker powered by CartoDB Voyager tiles for rock-solid Android compatibility.
  */
 
-import React, { useEffect, useState, useContext, useMemo } from 'react';
+import React, { useEffect, useRef, useContext, useState } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import MapView, { Marker, Callout } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 
 import useLocation from '../hooks/useLocation';
 import { ReportContext } from '../context/ReportContext';
-import { CATEGORIES, CategoryIcon } from '../constants/categories';
+import LeafletLocationPicker from '../components/LeafletLocationPicker';
 
 // Default fallback coordinates (e.g. Ahmedabad, India)
 const DEFAULT_COORDS = {
   latitude: 23.0225,
-  longitude: 72.5714,
-  latitudeDelta: 0.015,
-  longitudeDelta: 0.015
+  longitude: 72.5714
 };
 
 export default function LocationPickerScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const { reports } = useContext(ReportContext);
-  
+  const pickerRef = useRef(null);
+  const [isLocating, setIsLocating] = useState(false);
+
   const {
     location,
     address,
@@ -37,30 +37,26 @@ export default function LocationPickerScreen() {
     getCurrentLocation
   } = useLocation();
 
-  const [region, setRegion] = useState({
-    latitude: DEFAULT_COORDS.latitude,
-    longitude: DEFAULT_COORDS.longitude,
-    latitudeDelta: DEFAULT_COORDS.latitudeDelta,
-    longitudeDelta: DEFAULT_COORDS.longitudeDelta
-  });
+  const activeCoords = location || {
+    latitude: params.latitude ? parseFloat(params.latitude) : DEFAULT_COORDS.latitude,
+    longitude: params.longitude ? parseFloat(params.longitude) : DEFAULT_COORDS.longitude
+  };
 
   useEffect(() => {
     const initLocation = async () => {
       const res = await getCurrentLocation();
       if (res && res.coords) {
-        setRegion({
-          latitude: res.coords.latitude,
-          longitude: res.coords.longitude,
-          latitudeDelta: DEFAULT_COORDS.latitudeDelta,
-          longitudeDelta: DEFAULT_COORDS.longitudeDelta
-        });
+        setLocation(res.coords);
+        if (pickerRef.current) {
+          pickerRef.current.flyTo(res.coords.latitude, res.coords.longitude);
+        }
       }
     };
-    
+
     initLocation();
   }, []);
 
-  const handleMarkerDragEnd = async (coords) => {
+  const handleLocationChange = async (coords) => {
     setLocation(coords);
     try {
       const geocode = await Location.reverseGeocodeAsync(coords);
@@ -86,70 +82,33 @@ export default function LocationPickerScreen() {
   };
 
   const handleSnapToCurrent = async () => {
-    const res = await getCurrentLocation();
-    if (res && res.coords) {
-      setRegion({
-        latitude: res.coords.latitude,
-        longitude: res.coords.longitude,
-        latitudeDelta: DEFAULT_COORDS.latitudeDelta,
-        longitudeDelta: DEFAULT_COORDS.longitudeDelta
-      });
+    setIsLocating(true);
+    try {
+      const res = await getCurrentLocation();
+      if (res && res.coords) {
+        setLocation(res.coords);
+        if (pickerRef.current) {
+          pickerRef.current.flyTo(res.coords.latitude, res.coords.longitude);
+        }
+      }
+    } finally {
+      setIsLocating(false);
     }
   };
 
   const handleConfirmLocation = () => {
-    if (!location) return;
+    if (!location && !activeCoords) return;
+    const finalCoords = location || activeCoords;
     router.navigate({
       pathname: '/(tabs)/report',
       params: {
         ...params,
-        latitude: location.latitude,
-        longitude: location.longitude,
-        address: address
+        latitude: finalCoords.latitude,
+        longitude: finalCoords.longitude,
+        address: address || 'Selected Location'
       }
     });
   };
-
-  const nearbyIssueMarkers = useMemo(() => {
-    return reports.map((rep) => {
-      if (!rep.location || !rep.location.latitude || !rep.location.longitude) return null;
-
-      return (
-        <Marker
-          key={`nearby_${rep._id}`}
-          coordinate={{
-            latitude: parseFloat(rep.location.latitude),
-            longitude: parseFloat(rep.location.longitude)
-          }}
-          opacity={0.85}
-          tracksViewChanges={false}
-        >
-          <View
-            className="bg-surface border border-cardBorder w-8 h-8 rounded-xl items-center justify-center"
-            style={{
-              shadowColor: '#1C1917',
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.1,
-              shadowRadius: 3,
-              elevation: 2
-            }}
-          >
-            <CategoryIcon categoryId={rep.category} size={16} color="#F97316" />
-          </View>
-          <Callout tooltip={false}>
-            <View style={{ padding: 8, width: 160, backgroundColor: '#FDFAF7', borderRadius: 12, borderWidth: 1, borderColor: '#E8E0D8' }}>
-              <Text style={{ fontSize: 12, fontWeight: '700', color: '#1C1917' }} numberOfLines={1}>
-                {String(rep.title || 'Civic Issue')}
-              </Text>
-              <Text style={{ fontSize: 10, color: '#F97316', fontWeight: '700', marginTop: 2 }}>
-                Existing Report
-              </Text>
-            </View>
-          </Callout>
-        </Marker>
-      );
-    }).filter(Boolean);
-  }, [reports]);
 
   const renderConfirmButtonText = loading ? (
     <ActivityIndicator size="small" color="#FFFFFF" />
@@ -170,29 +129,17 @@ export default function LocationPickerScreen() {
       </View>
 
       {/* Map Area */}
-      <View className="flex-1 bg-surface justify-center items-center">
-        <MapView
-          style={{ width: '100%', height: '100%' }}
-          region={region}
-          onRegionChangeComplete={setRegion}
-          showsUserLocation={true}
-          showsMyLocationButton={false}
-        >
-          {nearbyIssueMarkers}
-          {location ? (
-            <Marker
-              coordinate={location}
-              draggable
-              onDragEnd={(e) => handleMarkerDragEnd(e.nativeEvent.coordinate)}
-              title="Drag me to the issue"
-              description={address || ''}
-              pinColor="#F97316"
-            />
-          ) : null}
-        </MapView>
+      <View className="flex-1 bg-surface relative">
+        <LeafletLocationPicker
+          ref={pickerRef}
+          initialCoords={activeCoords}
+          onLocationChange={handleLocationChange}
+          nearbyReports={reports}
+        />
 
         <TouchableOpacity
           onPress={handleSnapToCurrent}
+          disabled={isLocating}
           className="absolute bottom-6 right-6 bg-surface border border-cardBorder w-12 h-12 rounded-2xl items-center justify-center z-10"
           style={{
             shadowColor: '#1C1917',
@@ -202,7 +149,11 @@ export default function LocationPickerScreen() {
             elevation: 4
           }}
         >
-          <Ionicons name="locate" size={22} color="#F97316" />
+          {isLocating ? (
+            <ActivityIndicator size="small" color="#F97316" />
+          ) : (
+            <Ionicons name="locate" size={22} color="#F97316" />
+          )}
         </TouchableOpacity>
       </View>
 
@@ -224,11 +175,11 @@ export default function LocationPickerScreen() {
 
         <TouchableOpacity
           onPress={handleConfirmLocation}
-          disabled={loading || !location}
+          disabled={loading || (!location && !activeCoords)}
           className={`py-3.5 rounded-2xl items-center ${
-            !location ? 'bg-cardBorder opacity-60' : 'bg-primary active:opacity-90'
+            !location && !activeCoords ? 'bg-cardBorder opacity-60' : 'bg-primary active:opacity-90'
           }`}
-          style={location ? {
+          style={location || activeCoords ? {
             shadowColor: '#F97316',
             shadowOffset: { width: 0, height: 4 },
             shadowOpacity: 0.25,

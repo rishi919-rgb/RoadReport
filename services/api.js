@@ -12,7 +12,7 @@ import * as SecureStore from 'expo-secure-store';
 // without changing this file.
 const api = axios.create({
   baseURL: process.env.EXPO_PUBLIC_API_URL || 'https://roadreport-plu6.onrender.com/api',
-  timeout: 15000,
+  timeout: 45000, // 45 seconds to comfortably accommodate Render free-tier cold-start wake-up times
 });
 
 // A callback to notify AuthContext to update UI state on 401 unauthorized
@@ -50,16 +50,32 @@ api.interceptors.request.use(
 
 /**
  * Response Interceptor
- * Intercepts responses to catch 401 errors for auto-logout, and handles automatic network host failovers.
+ * Intercepts responses to catch 401 errors for auto-logout, and handles automatic network retry on Render cold boot.
  */
 api.interceptors.response.use(
   (response) => {
     return response;
   },
   async (error) => {
-    const originalRequest = error.config;
+    const config = error.config;
 
-    // 1. Handle 401 Unauthorized Session Expired
+    // 1. Auto-retry once on network error, ECONNABORTED (timeout), or 502/503/504 Bad Gateway / Service Unavailable during Render spin-up
+    if (config && (!config._retryCount || config._retryCount < 2)) {
+      const isNetworkOrTimeout =
+        !error.response ||
+        error.code === 'ECONNABORTED' ||
+        [502, 503, 504].includes(error.response?.status);
+
+      if (isNetworkOrTimeout) {
+        config._retryCount = (config._retryCount || 0) + 1;
+        console.log(`[API Retry] Attempt ${config._retryCount} for ${config.url} due to Render cold boot or network lag...`);
+        // Wait 2 seconds before retrying
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        return api(config);
+      }
+    }
+
+    // 2. Handle 401 Unauthorized Session Expired
     if (error.response && error.response.status === 401) {
       try {
         await SecureStore.deleteItemAsync('roadreport_jwt_token');
