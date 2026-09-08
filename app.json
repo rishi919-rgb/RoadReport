@@ -18,6 +18,7 @@
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
         "CAMERA",
+        "RECORD_AUDIO",
         "READ_EXTERNAL_STORAGE",
         "WRITE_EXTERNAL_STORAGE"
       ],
@@ -52,7 +53,8 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow RoadReport to access your camera to capture issue photos."
+          "cameraPermission": "Allow RoadReport to access your camera to capture issue photos.",
+          "microphonePermission": "Allow RoadReport to access your microphone to record issue videos."
         }
       ],
       [

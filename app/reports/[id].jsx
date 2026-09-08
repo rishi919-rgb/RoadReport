@@ -159,15 +159,30 @@ export default function ReportDetailsScreen() {
           }}
         >
           {report.media && report.media.length > 0 ? (
-            <Image
-              source={{ uri: report.media[0] }}
-              className="w-full h-full"
-              resizeMode="cover"
-            />
+            <View className="w-full h-full relative">
+              <Image
+                source={{ uri: report.media[0] }}
+                className="w-full h-full"
+                resizeMode="cover"
+              />
+              {(report.media[0].toLowerCase().endsWith('.mp4') ||
+                report.media[0].toLowerCase().endsWith('.mov') ||
+                report.media[0].toLowerCase().endsWith('.m4v')) && (
+                <View className="absolute inset-0 items-center justify-center bg-black/30">
+                  <View className="w-14 h-14 rounded-full bg-primary/90 items-center justify-center shadow-lg">
+                    <Ionicons name="play" size={26} color="#FAFAF9" style={{ marginLeft: 3 }} />
+                  </View>
+                  <View className="mt-2 bg-surface/95 border border-cardBorder px-3 py-1 rounded-full flex-row items-center shadow-sm">
+                    <Ionicons name="videocam" size={13} color="#F97316" style={{ marginRight: 5 }} />
+                    <Text className="text-textDark font-bold text-xs">Video Evidence (≤10s)</Text>
+                  </View>
+                </View>
+              )}
+            </View>
           ) : (
             <View className="w-full h-full items-center justify-center bg-surfaceAlt">
               <CategoryIcon categoryId={report.category} size={48} color="#F97316" />
-              <Text className="text-textMuted text-xs mt-2 font-medium">No photo evidence attached</Text>
+              <Text className="text-textMuted text-xs mt-2 font-medium">No media evidence attached</Text>
             </View>
           )}
         </View>

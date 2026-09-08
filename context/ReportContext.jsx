@@ -20,6 +20,8 @@ const INITIAL_DRAFT = {
   description: '',
   severity: 'medium',
   photoUri: '',
+  mediaType: 'image',
+  mediaDuration: null,
   location: null,
   address: '',
   isAnonymous: false

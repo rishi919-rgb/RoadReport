@@ -57,9 +57,9 @@ const MiniMapPreview = ({ latitude = 23.0225, longitude = 72.5714, height = 180 
               attributionControl: false
             });
 
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-              subdomains: 'abcd',
-              maxZoom: 19
+            L.tileLayer('https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+              subdomains: ['0', '1', '2', '3'],
+              maxZoom: 20
             }).addTo(map);
 
             var pinSvg = '<svg width="30" height="40" viewBox="0 0 30 40" fill="none" xmlns="http://www.w3.org/2000/svg">' +

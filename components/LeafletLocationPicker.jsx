@@ -113,10 +113,10 @@ const LeafletLocationPicker = forwardRef(({
                 attributionControl: false
               });
 
-              // Add CartoDB Voyager tiles (crisp, high-contrast, free & CORS enabled)
-              L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-                subdomains: 'abcd',
-                maxZoom: 19
+              // Add Google Maps roadmap tiles (crisp, high-definition, landmark-rich, zero watermark)
+              L.tileLayer('https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+                subdomains: ['0', '1', '2', '3'],
+                maxZoom: 20
               }).addTo(map);
 
               // Draggable Amber Pin SVG

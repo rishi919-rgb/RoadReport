@@ -43,6 +43,12 @@ export default function ReportIssueScreen() {
   const photoUri = draftReport.photoUri || '';
   const setPhotoUri = (p) => updateDraftReport({ photoUri: p });
 
+  const mediaType = draftReport.mediaType || 'image';
+  const setMediaType = (t) => updateDraftReport({ mediaType: t });
+
+  const mediaDuration = draftReport.mediaDuration || null;
+  const setMediaDuration = (d) => updateDraftReport({ mediaDuration: d });
+
   const location = draftReport.location || null;
   const setLocation = (l) => updateDraftReport({ location: l });
 
@@ -89,6 +95,61 @@ export default function ReportIssueScreen() {
     }
   }, [params.category, params.title, params.description, params.severity, params.photoUri, params.latitude, params.longitude, params.address]);
 
+  const handleTakePhoto = async () => {
+    try {
+      const perm = await ImagePicker.requestCameraPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert('Permission Denied', 'Camera access is required to take photos.');
+        return;
+      }
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        quality: 0.8
+      });
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const compressedUri = await compressImage(result.assets[0].uri);
+        updateDraftReport({
+          photoUri: compressedUri,
+          mediaType: 'image',
+          mediaDuration: null
+        });
+      }
+    } catch (e) {
+      console.error('Camera capture error:', e.message);
+    }
+  };
+
+  const handleRecordVideo = async () => {
+    try {
+      const cameraPerm = await ImagePicker.requestCameraPermissionsAsync();
+      if (!cameraPerm.granted) {
+        Alert.alert('Permission Denied', 'Camera access is required to record video.');
+        return;
+      }
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['videos'],
+        videoMaxDuration: 10,
+        quality: 0.8
+      });
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        const durSec = asset.duration ? (asset.duration > 100 ? asset.duration / 1000 : asset.duration) : 10;
+        if (durSec > 11) {
+          Alert.alert('Video Exceeds Limit', `Video must be 10 seconds or shorter (recorded: ${Math.round(durSec)}s). Please record a shorter clip.`);
+          return;
+        }
+        updateDraftReport({
+          photoUri: asset.uri,
+          mediaType: 'video',
+          mediaDuration: durSec
+        });
+      }
+    } catch (e) {
+      console.error('Video record error:', e.message);
+    }
+  };
+
   const handlePickImage = async () => {
     try {
       const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -100,21 +161,60 @@ export default function ReportIssueScreen() {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
         allowsEditing: true,
-        quality: 1
+        quality: 0.8
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const pickedUri = result.assets[0].uri;
         const compressedUri = await compressImage(pickedUri);
-        setPhotoUri(compressedUri);
+        updateDraftReport({
+          photoUri: compressedUri,
+          mediaType: 'image',
+          mediaDuration: null
+        });
       }
     } catch (e) {
-      console.error('Gallery picker error:', e.message);
+      console.error('Gallery image picker error:', e.message);
     }
   };
 
-  const handleRemovePhoto = () => {
-    setPhotoUri('');
+  const handlePickVideo = async () => {
+    try {
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permissionResult.granted) {
+        Alert.alert('Permission Denied', 'Media library access is required to choose videos.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['videos'],
+        videoMaxDuration: 10
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        const durSec = asset.duration ? (asset.duration > 100 ? asset.duration / 1000 : asset.duration) : null;
+        if (durSec && durSec > 11) {
+          Alert.alert('Video Too Long', `Please select a video of at most 10 seconds (selected video is ${Math.round(durSec)}s).`);
+          return;
+        }
+        updateDraftReport({
+          photoUri: asset.uri,
+          mediaType: 'video',
+          mediaDuration: durSec || 10
+        });
+      }
+    } catch (e) {
+      console.error('Gallery video picker error:', e.message);
+    }
+  };
+
+  const handleRemoveMedia = () => {
+    updateDraftReport({
+      photoUri: '',
+      mediaType: 'image',
+      mediaDuration: null
+    });
   };
 
   const handleUseCurrentLocation = async () => {
@@ -349,48 +449,74 @@ export default function ReportIssueScreen() {
           </View>
         ) : null}
 
-        {/* STEP 3: MEDIA ATTACHMENTS */}
+        {/* STEP 3: MEDIA ATTACHMENTS (Photo or 10s Video) */}
         {step === 3 ? (
           <View>
-            <Text className="text-textDark text-2xl font-extrabold tracking-tight mb-0.5">Attach Photo</Text>
-            <Text className="text-textMuted text-xs font-medium mb-5">Clear photos help municipal teams resolve issues faster</Text>
+            <View className="flex-row items-center justify-between mb-0.5">
+              <Text className="text-textDark text-2xl font-extrabold tracking-tight">Attach Evidence</Text>
+              <View className="bg-primaryLight border border-primaryMid px-2.5 py-0.5 rounded-full">
+                <Text className="text-primary text-[10px] font-bold uppercase tracking-wider">Photo or 10s Video</Text>
+              </View>
+            </View>
+            <Text className="text-textMuted text-xs font-medium mb-5">
+              Attach a clear photo or short video (max 10s) to help municipal authorities inspect the issue
+            </Text>
             
             {photoUri ? (
-              <MediaPreview uri={photoUri} onRemove={handleRemovePhoto} />
+              <MediaPreview
+                uri={photoUri}
+                mediaType={mediaType}
+                duration={mediaDuration}
+                onRemove={handleRemoveMedia}
+              />
             ) : (
-              <View className="flex-col gap-3.5">
-                <TouchableOpacity
-                  onPress={() => router.push({
-                    pathname: '/camera',
-                    params: { category, title, description, severity }
-                  })}
-                  className="bg-primaryLight border border-primaryMid py-8 rounded-2xl items-center justify-center"
-                  style={{
-                    shadowColor: '#F97316',
-                    shadowOffset: { width: 0, height: 2 },
-                    shadowOpacity: 0.08,
-                    shadowRadius: 6,
-                    elevation: 2,
-                  }}
-                >
-                  <Ionicons name="camera" size={32} color="#F97316" className="mb-1" />
-                  <Text className="text-primary font-bold text-sm mt-2">Take Photo with Camera</Text>
-                </TouchableOpacity>
+              <View className="flex-col gap-3">
+                
+                {/* 1. Camera Options Row */}
+                <View className="flex-row gap-3">
+                  <TouchableOpacity
+                    onPress={handleTakePhoto}
+                    activeOpacity={0.8}
+                    className="flex-1 bg-primaryLight border border-primaryMid p-5 rounded-2xl items-center justify-center shadow-sm"
+                  >
+                    <Ionicons name="camera" size={28} color="#F97316" className="mb-1" />
+                    <Text className="text-primary font-bold text-xs mt-1.5 text-center">Take Photo</Text>
+                  </TouchableOpacity>
 
-                <TouchableOpacity
-                  onPress={handlePickImage}
-                  className="bg-surface border border-cardBorder py-8 rounded-2xl items-center justify-center"
-                  style={{
-                    shadowColor: '#1C1917',
-                    shadowOffset: { width: 0, height: 2 },
-                    shadowOpacity: 0.05,
-                    shadowRadius: 6,
-                    elevation: 2,
-                  }}
-                >
-                  <Ionicons name="images" size={32} color="#A8A29E" className="mb-1" />
-                  <Text className="text-textBody font-bold text-sm mt-2">Choose from Gallery</Text>
-                </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={handleRecordVideo}
+                    activeOpacity={0.8}
+                    className="flex-1 bg-surface border-2 border-primary/40 p-5 rounded-2xl items-center justify-center shadow-sm relative"
+                  >
+                    <View className="absolute top-2 right-2 bg-danger px-1.5 py-0.5 rounded-md">
+                      <Text className="text-white text-[9px] font-extrabold">10s MAX</Text>
+                    </View>
+                    <Ionicons name="videocam" size={28} color="#F97316" className="mb-1" />
+                    <Text className="text-textDark font-bold text-xs mt-1.5 text-center">Record Video</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* 2. Gallery Options Row */}
+                <View className="flex-row gap-3">
+                  <TouchableOpacity
+                    onPress={handlePickImage}
+                    activeOpacity={0.8}
+                    className="flex-1 bg-surface border border-cardBorder p-4 rounded-2xl items-center justify-center shadow-sm"
+                  >
+                    <Ionicons name="images" size={24} color="#78716C" className="mb-1" />
+                    <Text className="text-textBody font-bold text-xs mt-1 text-center">Gallery Photo</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={handlePickVideo}
+                    activeOpacity={0.8}
+                    className="flex-1 bg-surface border border-cardBorder p-4 rounded-2xl items-center justify-center shadow-sm"
+                  >
+                    <Ionicons name="film" size={24} color="#78716C" className="mb-1" />
+                    <Text className="text-textBody font-bold text-xs mt-1 text-center">Gallery Video (≤10s)</Text>
+                  </TouchableOpacity>
+                </View>
+
               </View>
             )}
           </View>
@@ -522,8 +648,17 @@ export default function ReportIssueScreen() {
                 </View>
                 {photoUri ? (
                   <View className="items-end">
-                    <Text className="text-textMuted text-xs uppercase tracking-wider font-bold mb-1">Attached Photo</Text>
-                    <Image source={{ uri: photoUri }} className="w-14 h-14 rounded-xl border border-cardBorder" resizeMode="cover" />
+                    <Text className="text-textMuted text-xs uppercase tracking-wider font-bold mb-1">
+                      {mediaType === 'video' ? 'Attached Video (≤10s)' : 'Attached Photo'}
+                    </Text>
+                    <View className="relative w-14 h-14 rounded-xl overflow-hidden border border-cardBorder">
+                      <Image source={{ uri: photoUri }} className="w-full h-full" resizeMode="cover" />
+                      {mediaType === 'video' && (
+                        <View className="absolute inset-0 bg-black/40 items-center justify-center">
+                          <Ionicons name="play" size={16} color="#FFFFFF" />
+                        </View>
+                      )}
+                    </View>
                   </View>
                 ) : null}
               </View>
