@@ -44,42 +44,69 @@ const MiniMapPreview = ({ latitude = 23.0225, longitude = 72.5714, height = 180 
         <div id="map"></div>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js" onerror="this.onerror=null;this.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';"></script>
         <script>
-          try {
-            var map = L.map('map', {
-              center: [${lat}, ${lng}],
-              zoom: 16,
-              zoomControl: false,
-              dragging: false,
-              touchZoom: false,
-              doubleClickZoom: false,
-              scrollWheelZoom: false,
-              boxZoom: false,
-              keyboard: false,
-              attributionControl: false
-            });
+          function initMiniMap() {
+            var retries = 0;
+            function check() {
+              if (typeof window.L !== 'undefined' && window.L.map) {
+                renderMap();
+              } else if (retries < 60) {
+                retries++;
+                setTimeout(check, 80);
+              }
+            }
 
-            L.tileLayer('https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
-              subdomains: ['0', '1', '2', '3'],
-              maxZoom: 20
-            }).addTo(map);
+            function renderMap() {
+              try {
+                var map = L.map('map', {
+                  center: [${lat}, ${lng}],
+                  zoom: 16,
+                  zoomControl: false,
+                  dragging: false,
+                  touchZoom: false,
+                  doubleClickZoom: false,
+                  scrollWheelZoom: false,
+                  boxZoom: false,
+                  keyboard: false,
+                  attributionControl: false
+                });
 
-            var pinSvg = '<svg width="30" height="40" viewBox="0 0 30 40" fill="none" xmlns="http://www.w3.org/2000/svg">' +
-              '<path d="M15 0C6.71573 0 0 6.71573 0 15C0 24.5 15 40 15 40C15 40 30 24.5 30 15C30 6.71573 23.2843 0 15 0Z" fill="#F97316"/>' +
-              '<circle cx="15" cy="14" r="5.5" fill="#FFFFFF"/>' +
-              '<circle cx="15" cy="14" r="2.5" fill="#EA580C"/>' +
-              '</svg>';
+                var tiles = L.tileLayer('https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+                  subdomains: ['0', '1', '2', '3'],
+                  maxZoom: 20
+                });
 
-            var icon = L.divIcon({
-              html: pinSvg,
-              className: 'amber-pin',
-              iconSize: [30, 40],
-              iconAnchor: [15, 40]
-            });
+                tiles.on('tileerror', function() {
+                  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+                });
 
-            L.marker([${lat}, ${lng}], { icon: icon }).addTo(map);
-          } catch (e) {
-            console.error('MiniMap error:', e);
+                tiles.addTo(map);
+
+                var pinSvg = '<svg width="30" height="40" viewBox="0 0 30 40" fill="none" xmlns="http://www.w3.org/2000/svg">' +
+                  '<path d="M15 0C6.71573 0 0 6.71573 0 15C0 24.5 15 40 15 40C15 40 30 24.5 30 15C30 6.71573 23.2843 0 15 0Z" fill="#F97316"/>' +
+                  '<circle cx="15" cy="14" r="5.5" fill="#FFFFFF"/>' +
+                  '<circle cx="15" cy="14" r="2.5" fill="#EA580C"/>' +
+                  '</svg>';
+
+                var icon = L.divIcon({
+                  html: pinSvg,
+                  className: 'amber-pin',
+                  iconSize: [30, 40],
+                  iconAnchor: [15, 40]
+                });
+
+                L.marker([${lat}, ${lng}], { icon: icon }).addTo(map);
+
+                setTimeout(function() { map.invalidateSize(); }, 150);
+                setTimeout(function() { map.invalidateSize(); }, 400);
+              } catch (e) {
+                console.error('MiniMap error:', e);
+              }
+            }
+
+            check();
           }
+
+          initMiniMap();
         </script>
       </body>
     </html>
@@ -89,7 +116,7 @@ const MiniMapPreview = ({ latitude = 23.0225, longitude = 72.5714, height = 180 
     <View style={[{ height, width: '100%' }, styles.container]}>
       <WebView
         originWhitelist={['*']}
-        source={{ html: htmlContent }}
+        source={{ html: htmlContent, baseUrl: 'https://cdnjs.cloudflare.com' }}
         scrollEnabled={false}
         showsHorizontalScrollIndicator={false}
         showsVerticalScrollIndicator={false}

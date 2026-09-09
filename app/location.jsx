@@ -129,7 +129,7 @@ export default function LocationPickerScreen() {
       </View>
 
       {/* Map Area */}
-      <View className="flex-1 bg-surface relative">
+      <View style={{ flex: 1 }} className="flex-1 bg-surface relative">
         <LeafletLocationPicker
           ref={pickerRef}
           initialCoords={activeCoords}
