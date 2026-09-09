@@ -167,6 +167,57 @@ export const getReportsNear = async (latitude, longitude, distance = 50, categor
   }
 };
 
+/**
+ * Gets active emergency road hazard SOS alerts.
+ * @returns {Promise<Object>} API response payload with emergency alerts array.
+ */
+export const getEmergencyAlerts = async () => {
+  try {
+    const response = await api.get('/reports/alerts/emergency');
+    return response.data;
+  } catch (err) {
+    return {
+      success: false,
+      data: [],
+      message: err.response?.data?.message || err.message || 'Failed to fetch emergency alerts'
+    };
+  }
+};
+
+/**
+ * Assigns a work order to a municipal engineer team with a 36h SLA deadline.
+ * @param {string} id - Report ID.
+ * @param {Object} data - { engineerName, department, hours }.
+ */
+export const assignWorkOrder = async (id, data = {}) => {
+  try {
+    const response = await api.patch(`/reports/${id}/assign-order`, data);
+    return response.data;
+  } catch (err) {
+    return {
+      success: false,
+      message: err.response?.data?.message || err.message || 'Failed to assign work order'
+    };
+  }
+};
+
+/**
+ * Resolves a report with verified Before vs After photo proof.
+ * @param {string} id - Report ID.
+ * @param {Object} data - { afterPhotoUri, resolverNotes, department }.
+ */
+export const resolveWithProof = async (id, data = {}) => {
+  try {
+    const response = await api.patch(`/reports/${id}/resolve-proof`, data);
+    return response.data;
+  } catch (err) {
+    return {
+      success: false,
+      message: err.response?.data?.message || err.message || 'Failed to submit resolution proof'
+    };
+  }
+};
+
 export default {
   getReports,
   getMyReports,
@@ -176,6 +227,9 @@ export default {
   deleteReport,
   updateStatus,
   toggleUpvote,
-  getReportsNear
+  getReportsNear,
+  getEmergencyAlerts,
+  assignWorkOrder,
+  resolveWithProof
 };
 

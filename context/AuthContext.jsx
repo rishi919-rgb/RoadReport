@@ -10,16 +10,20 @@ import axios from 'axios';
 import { registerLogoutCallback } from '../services/api';
 import { getProfile, updateProfile, redeemPerk, convertPoints } from '../services/authService';
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 // Create the Context object
 export const AuthContext = createContext({});
 
-// Hardcode token storage key
+// Hardcode storage keys
 const TOKEN_KEY = 'roadreport_jwt_token';
+const ROLE_KEY = 'roadreport_active_role';
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [currentRole, setCurrentRole] = useState('citizen'); // 'citizen' | 'authority'
 
   // Register logout callback for interceptor
   useEffect(() => {
@@ -44,6 +48,11 @@ export const AuthProvider = ({ children }) => {
             // Token is invalid, clean up
             await SecureStore.deleteItemAsync(TOKEN_KEY);
           }
+        }
+
+        const savedRole = await AsyncStorage.getItem(ROLE_KEY);
+        if (savedRole) {
+          setCurrentRole(savedRole);
         }
       } catch (e) {
         console.log('No token found or validation failed:', e.message);
@@ -145,8 +154,36 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  /**
+   * Switches user mode between citizen and municipal authority.
+   * @param {string} [role] - Target role or toggles if empty.
+   */
+  const switchRole = async (role) => {
+    try {
+      const nextRole = role || (currentRole === 'citizen' ? 'authority' : 'citizen');
+      setCurrentRole(nextRole);
+      await AsyncStorage.setItem(ROLE_KEY, nextRole);
+      return nextRole;
+    } catch (e) {
+      console.error('Error switching role:', e);
+      return currentRole;
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, updateUserProfile, redeemUserPerk, convertUserPoints, loading, setUser }}>
+    <AuthContext.Provider value={{
+      user,
+      token,
+      login,
+      logout,
+      updateUserProfile,
+      redeemUserPerk,
+      convertUserPoints,
+      loading,
+      setUser,
+      currentRole,
+      switchRole
+    }}>
       {children}
     </AuthContext.Provider>
   );

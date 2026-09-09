@@ -38,7 +38,19 @@ const calculateDistance = (lat1, lon1, lat2, lon2) => {
  */
 const createReport = async (req, res) => {
   try {
-    const { title, description, category, severity, location, media, isAnonymous } = req.body;
+    const {
+      title,
+      description,
+      category,
+      severity,
+      location,
+      media,
+      isAnonymous,
+      isEmergencySOS,
+      hazardType,
+      voiceAudioUri,
+      voiceTranscript
+    } = req.body;
 
     // Check required fields
     if (!title || !description || !category || !location || !location.latitude || !location.longitude || !location.address) {
@@ -50,10 +62,14 @@ const createReport = async (req, res) => {
       title,
       description,
       category,
-      severity: severity || 'medium',
+      severity: isEmergencySOS ? 'high' : (severity || 'medium'),
       location,
       media: media || [],
       isAnonymous: Boolean(isAnonymous),
+      isEmergencySOS: Boolean(isEmergencySOS),
+      hazardType: hazardType || 'none',
+      voiceAudioUri: voiceAudioUri || '',
+      voiceTranscript: voiceTranscript || '',
       user: req.user._id
     });
 
@@ -346,6 +362,104 @@ const toggleUpvoteReport = async (req, res) => {
   }
 };
 
+/**
+ * Gets all active emergency SOS road hazard alerts.
+ * @param {Object} req - Express request object.
+ * @param {Object} res - Express response object.
+ */
+const getEmergencyAlerts = async (req, res) => {
+  try {
+    const alerts = await Report.find({
+      isEmergencySOS: true,
+      status: { $ne: 'resolved' }
+    })
+      .populate('user', 'name')
+      .sort({ createdAt: -1 })
+      .limit(20);
+
+    return res.status(200).json({
+      success: true,
+      count: alerts.length,
+      data: alerts
+    });
+  } catch (error) {
+    console.error('Get Emergency Alerts Error:', error.message);
+    return res.status(500).json({ success: false, message: 'Failed to retrieve emergency alerts' });
+  }
+};
+
+/**
+ * Assigns a work order to a municipal engineer with a 36-hour SLA timer.
+ * @param {Object} req - Express request object.
+ * @param {Object} res - Express response object.
+ */
+const assignWorkOrder = async (req, res) => {
+  try {
+    const { engineerName, department, hours = 36 } = req.body;
+    const report = await Report.findById(req.params.id);
+
+    if (!report) {
+      return res.status(404).json({ success: false, message: 'Report not found' });
+    }
+
+    const assignedAt = new Date();
+    const slaDeadline = new Date(assignedAt.getTime() + (parseInt(hours) || 36) * 3600 * 1000);
+
+    report.status = 'in_progress';
+    report.assignedEngineer = {
+      name: engineerName || 'Field Engineer Team',
+      department: department || 'Municipal Roads & Infrastructure',
+      assignedAt,
+      slaDeadline
+    };
+
+    const updated = await report.save();
+    return res.status(200).json({ success: true, data: updated });
+  } catch (error) {
+    console.error('Assign Work Order Error:', error.message);
+    return res.status(500).json({ success: false, message: 'Failed to assign work order' });
+  }
+};
+
+/**
+ * Resolves a report with verified Before vs After photo proof and department stamp.
+ * @param {Object} req - Express request object.
+ * @param {Object} res - Express response object.
+ */
+const resolveReportWithProof = async (req, res) => {
+  try {
+    const { afterPhotoUri, resolverNotes, department } = req.body;
+    const report = await Report.findById(req.params.id);
+
+    if (!report) {
+      return res.status(404).json({ success: false, message: 'Report not found' });
+    }
+
+    const resolvedAt = new Date();
+    let withinSLA = true;
+
+    if (report.assignedEngineer && report.assignedEngineer.slaDeadline) {
+      withinSLA = resolvedAt <= new Date(report.assignedEngineer.slaDeadline);
+    }
+
+    report.status = 'resolved';
+    report.resolutionProof = {
+      afterPhotoUri: afterPhotoUri || '',
+      resolvedAt,
+      resolverNotes: resolverNotes || 'Work inspected and completed according to civic safety standards.',
+      department: department || report.assignedEngineer?.department || 'Municipal Works Dept',
+      verifiedBy: req.user?.name || 'Municipal Officer',
+      withinSLA
+    };
+
+    const updated = await report.save();
+    return res.status(200).json({ success: true, data: updated });
+  } catch (error) {
+    console.error('Resolve With Proof Error:', error.message);
+    return res.status(500).json({ success: false, message: 'Failed to record resolution proof' });
+  }
+};
+
 module.exports = {
   createReport,
   getReports,
@@ -354,5 +468,8 @@ module.exports = {
   updateReport,
   deleteReport,
   updateReportStatus,
-  toggleUpvoteReport
+  toggleUpvoteReport,
+  getEmergencyAlerts,
+  assignWorkOrder,
+  resolveReportWithProof
 };

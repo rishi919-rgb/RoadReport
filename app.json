@@ -12,7 +12,6 @@
     },
     "android": {
       "package": "com.rishi919.roadreport",
-      "usesCleartextTraffic": true,
       "permissions": [
         "INTERNET",
         "ACCESS_COARSE_LOCATION",
@@ -65,7 +64,9 @@
       ],
       "expo-secure-store",
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-image",
+      "expo-status-bar"
     ],
     "experiments": {
       "typedRoutes": true,

@@ -27,6 +27,9 @@ router.route('/')
   .post(createReport)
   .get(getReports);
 
+// Fetch active emergency SOS road hazard alerts (mounted before /:id)
+router.get('/alerts/emergency', getEmergencyAlerts);
+
 // Fetch only the logged-in user's own reports
 router.get('/my', getMyReports);
 
@@ -38,6 +41,12 @@ router.route('/:id')
 
 // Update report resolution status
 router.patch('/:id/status', updateReportStatus);
+
+// Assign work order to municipal engineer
+router.patch('/:id/assign-order', assignWorkOrder);
+
+// Resolve report with verified Before vs After photo proof
+router.patch('/:id/resolve-proof', resolveReportWithProof);
 
 // Toggle upvoting a report
 router.patch('/:id/upvote', toggleUpvoteReport);

@@ -24,12 +24,17 @@ const INITIAL_DRAFT = {
   mediaDuration: null,
   location: null,
   address: '',
-  isAnonymous: false
+  isAnonymous: false,
+  isEmergencySOS: false,
+  hazardType: '',
+  voiceAudioUri: null,
+  voiceTranscript: ''
 };
 
 export const ReportProvider = ({ children }) => {
   const [reports, setReports] = useState([]);
   const [myReports, setMyReports] = useState([]);
+  const [emergencyAlerts, setEmergencyAlerts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -180,11 +185,63 @@ export const ReportProvider = ({ children }) => {
     return { success: false };
   };
 
+  /**
+   * Fetches active emergency road hazard SOS alerts.
+   */
+  const fetchEmergencyAlerts = useCallback(async () => {
+    try {
+      const response = await reportService.getEmergencyAlerts();
+      if (response && response.success) {
+        setEmergencyAlerts(response.data || []);
+      }
+    } catch (e) {
+      console.error('Error fetching emergency alerts:', e.message);
+    }
+  }, []);
+
+  /**
+   * Assigns work order to municipal field team.
+   */
+  const assignReportWorkOrder = async (id, data) => {
+    try {
+      const response = await reportService.assignWorkOrder(id, data);
+      if (response && response.success) {
+        const updated = response.data;
+        setReports((prev) => prev.map((r) => (r._id === id ? updated : r)));
+        setMyReports((prev) => prev.map((r) => (r._id === id ? updated : r)));
+        return { success: true, data: updated };
+      }
+      return { success: false, message: response.message };
+    } catch (e) {
+      return { success: false, message: e.message };
+    }
+  };
+
+  /**
+   * Resolves a report with verified Before vs After photo proof.
+   */
+  const resolveReportProof = async (id, data) => {
+    try {
+      const response = await reportService.resolveWithProof(id, data);
+      if (response && response.success) {
+        const updated = response.data;
+        setReports((prev) => prev.map((r) => (r._id === id ? updated : r)));
+        setMyReports((prev) => prev.map((r) => (r._id === id ? updated : r)));
+        setEmergencyAlerts((prev) => prev.filter((r) => r._id !== id));
+        return { success: true, data: updated };
+      }
+      return { success: false, message: response.message };
+    } catch (e) {
+      return { success: false, message: e.message };
+    }
+  };
+
   return (
     <ReportContext.Provider
       value={{
         reports,
         myReports,
+        emergencyAlerts,
         loading,
         error,
         draftReport,
@@ -192,11 +249,15 @@ export const ReportProvider = ({ children }) => {
         resetDraftReport,
         fetchReports,
         fetchMyReports,
+        fetchEmergencyAlerts,
         createReport,
         updateReportStatus,
         toggleUpvote,
+        assignReportWorkOrder,
+        resolveReportProof,
         setReports,
-        setMyReports
+        setMyReports,
+        setEmergencyAlerts
       }}
     >
       {children}

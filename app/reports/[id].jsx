@@ -210,8 +210,115 @@ export default function ReportDetailsScreen() {
                 {report.severity} Priority
               </Text>
             </View>
+            {report.isEmergencySOS ? (
+              <View className="bg-red-500/15 border border-red-500/40 px-3 py-1.5 rounded-full ml-2 flex-row items-center">
+                <Ionicons name="warning" size={12} color="#EF4444" />
+                <Text className="text-danger text-xs font-extrabold ml-1 uppercase">SOS HAZARD</Text>
+              </View>
+            ) : null}
           </View>
         </View>
+
+        {/* Voice Note Transcript Card (if recorded) */}
+        {report.voiceTranscript ? (
+          <View className="bg-orange-500/10 border border-primary/30 p-4 rounded-3xl mb-5">
+            <View className="flex-row items-center justify-between mb-1.5">
+              <View className="flex-row items-center">
+                <Ionicons name="mic" size={16} color="#F97316" />
+                <Text className="text-primary text-xs font-extrabold ml-1.5 uppercase tracking-wider">
+                  Recorded Voice Complaint
+                </Text>
+              </View>
+              <View className="bg-orange-500/20 px-2 py-0.5 rounded-full">
+                <Text className="text-primary text-[10px] font-bold">Auto-Transcribed</Text>
+              </View>
+            </View>
+            <Text className="text-textDark text-sm italic font-medium leading-relaxed">
+              "{report.voiceTranscript}"
+            </Text>
+          </View>
+        ) : null}
+
+        {/* Assigned Municipal Field Engineer Card */}
+        {report.assignedEngineer?.name ? (
+          <View className="mb-5 bg-sky-500/10 border border-sky-500/20 p-4 rounded-3xl flex-row items-center">
+            <View className="w-10 h-10 rounded-2xl bg-sky-500/20 items-center justify-center mr-3">
+              <Ionicons name="construct" size={20} color="#0284C7" />
+            </View>
+            <View className="flex-1">
+              <Text className="text-sky-700 font-extrabold text-xs uppercase tracking-wider">
+                Assigned Field Engineer
+              </Text>
+              <Text className="text-textDark font-bold text-sm mt-0.5">
+                {report.assignedEngineer.name}
+              </Text>
+              <Text className="text-textMuted text-xs">
+                {report.assignedEngineer.department || 'Roads & Infrastructure Department'}
+              </Text>
+            </View>
+          </View>
+        ) : null}
+
+        {/* Verified Resolution Proof (Before vs After) */}
+        {report.resolutionProof?.afterPhotoUri ? (
+          <View
+            className="mb-5 bg-surface border-2 border-success/40 p-5 rounded-3xl"
+            style={{
+              shadowColor: '#16A34A',
+              shadowOffset: { width: 0, height: 3 },
+              shadowOpacity: 0.1,
+              shadowRadius: 8,
+              elevation: 3
+            }}
+          >
+            <View className="flex-row items-center justify-between mb-3">
+              <View className="flex-row items-center">
+                <Ionicons name="shield-checkmark" size={20} color="#16A34A" />
+                <Text className="text-success text-sm font-extrabold ml-2">
+                  Verified Resolution Proof
+                </Text>
+              </View>
+              <View className="bg-success/15 px-2.5 py-0.5 rounded-full border border-success/30">
+                <Text className="text-success text-[10px] font-extrabold uppercase">SLA Met</Text>
+              </View>
+            </View>
+
+            <View className="flex-row gap-3 mb-3">
+              <View className="flex-1">
+                <Text className="text-textMuted text-[10px] font-bold uppercase mb-1">Before (Reported)</Text>
+                {report.media?.[0] ? (
+                  <Image
+                    source={{ uri: report.media[0] }}
+                    className="w-full h-32 rounded-2xl bg-surfaceAlt"
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <View className="w-full h-32 rounded-2xl bg-surfaceAlt items-center justify-center">
+                    <Ionicons name="image-outline" size={24} color="#A8A29E" />
+                  </View>
+                )}
+              </View>
+              <View className="flex-1">
+                <Text className="text-success text-[10px] font-bold uppercase mb-1">After (Repaired)</Text>
+                <Image
+                  source={{ uri: report.resolutionProof.afterPhotoUri }}
+                  className="w-full h-32 rounded-2xl bg-surfaceAlt border-2 border-success"
+                  resizeMode="cover"
+                />
+              </View>
+            </View>
+
+            <View className="bg-surfaceAlt p-3 rounded-2xl border border-cardBorder">
+              <Text className="text-textDark text-xs font-bold">Field Engineer Resolution Notes:</Text>
+              <Text className="text-textBody text-xs mt-1">
+                "{report.resolutionProof.notes || 'Issue repaired according to municipal standards and site inspected for public safety.'}"
+              </Text>
+              <Text className="text-textMuted text-[10px] mt-1.5 font-medium">
+                Inspected by: {report.resolutionProof.resolvedBy || 'Municipal Rapid Response Unit'}
+              </Text>
+            </View>
+          </View>
+        ) : null}
 
         {/* Description Card */}
         <View

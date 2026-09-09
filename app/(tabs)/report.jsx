@@ -16,6 +16,7 @@ import MediaPreview from '../../components/MediaPreview';
 import useLocation from '../../hooks/useLocation';
 import { compressImage } from '../../utils/imageCompressor';
 import { ReportContext } from '../../context/ReportContext';
+import VoiceRecorderModal from '../../components/VoiceRecorderModal';
 import reportService from '../../services/reportService';
 
 export default function ReportIssueScreen() {
@@ -57,6 +58,17 @@ export default function ReportIssueScreen() {
 
   const isAnonymous = Boolean(draftReport.isAnonymous);
   const setIsAnonymous = (val) => updateDraftReport({ isAnonymous: val });
+
+  const isEmergencySOS = Boolean(draftReport.isEmergencySOS);
+  const setIsEmergencySOS = (val) => updateDraftReport({ isEmergencySOS: val });
+
+  const hazardType = draftReport.hazardType || 'open_manhole';
+  const setHazardType = (val) => updateDraftReport({ hazardType: val });
+
+  const voiceAudioUri = draftReport.voiceAudioUri || null;
+  const voiceTranscript = draftReport.voiceTranscript || '';
+
+  const [voiceModalVisible, setVoiceModalVisible] = useState(false);
 
   useEffect(() => {
     if (scrollViewRef.current) {
@@ -274,8 +286,12 @@ export default function ReportIssueScreen() {
         title,
         description,
         category,
-        severity,
+        severity: isEmergencySOS ? 'high' : severity,
         isAnonymous,
+        isEmergencySOS,
+        hazardType: isEmergencySOS ? hazardType : undefined,
+        voiceAudioUri,
+        voiceTranscript,
         location: {
           latitude: location.latitude,
           longitude: location.longitude,
@@ -401,6 +417,39 @@ export default function ReportIssueScreen() {
               />
             </View>
 
+            {/* Voice Complaint & Speech-to-Text Button */}
+            <TouchableOpacity
+              onPress={() => setVoiceModalVisible(true)}
+              activeOpacity={0.8}
+              className="mb-4 flex-row items-center justify-center bg-orange-500/10 border border-dashed border-primary rounded-2xl py-3 px-4"
+            >
+              <Ionicons name="mic" size={18} color="#F97316" />
+              <Text className="text-primary font-bold text-xs ml-2">
+                {voiceAudioUri ? '🎙️ Audio Note Attached (Tap to Re-record)' : '🎙️ Record Voice Complaint (Audio + Auto-Transcript)'}
+              </Text>
+            </TouchableOpacity>
+
+            {voiceTranscript ? (
+              <View className="mb-4 bg-surfaceAlt border border-cardBorder p-3 rounded-2xl">
+                <View className="flex-row items-center justify-between mb-1">
+                  <View className="flex-row items-center">
+                    <Ionicons name="sparkles" size={13} color="#F97316" />
+                    <Text className="text-primary text-[11px] font-bold ml-1">AI Transcript Generated</Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => {
+                      updateDraftReport({ voiceAudioUri: null, voiceTranscript: '' });
+                    }}
+                  >
+                    <Text className="text-danger text-[11px] font-semibold">Remove</Text>
+                  </TouchableOpacity>
+                </View>
+                <Text className="text-textDark text-xs leading-4" numberOfLines={2}>
+                  "{voiceTranscript}"
+                </Text>
+              </View>
+            ) : null}
+
             <View className="mb-4">
               <Text className="text-textBody text-xs uppercase tracking-widest font-bold mb-1.5">Severity Level</Text>
               <View className="flex-row justify-between bg-surface border border-cardBorder p-1.5 rounded-2xl">
@@ -422,6 +471,80 @@ export default function ReportIssueScreen() {
                 })}
               </View>
             </View>
+
+            {/* Emergency Road Hazard SOS Toggle Card */}
+            <TouchableOpacity
+              onPress={() => {
+                const nextVal = !isEmergencySOS;
+                setIsEmergencySOS(nextVal);
+                if (nextVal) {
+                  setSeverity('high');
+                  if (!hazardType) setHazardType('open_manhole');
+                }
+              }}
+              activeOpacity={0.8}
+              className={`p-4 rounded-2xl border mb-4 ${
+                isEmergencySOS ? 'bg-danger/10 border-danger' : 'bg-surface border-cardBorder'
+              }`}
+            >
+              <View className="flex-row items-center justify-between">
+                <View className="flex-row items-center flex-1 pr-3">
+                  <View className={`w-9 h-9 rounded-xl items-center justify-center mr-3 ${isEmergencySOS ? 'bg-danger' : 'bg-surfaceAlt'}`}>
+                    <Ionicons name="warning" size={20} color={isEmergencySOS ? "#FFFFFF" : "#EF4444"} />
+                  </View>
+                  <View className="flex-1">
+                    <Text className={`font-bold text-sm ${isEmergencySOS ? 'text-danger' : 'text-textDark'}`}>
+                      Flag as Emergency Road Hazard (SOS)
+                    </Text>
+                    <Text className="text-textMuted text-xs mt-0.5">
+                      Life-threatening hazard (e.g. open manhole, live wire, cave-in)
+                    </Text>
+                  </View>
+                </View>
+                <View className={`w-5 h-5 rounded-md border items-center justify-center ${isEmergencySOS ? 'bg-danger border-danger' : 'border-cardBorder bg-surface'}`}>
+                  {isEmergencySOS ? <Ionicons name="checkmark" size={14} color="#FFFFFF" /> : null}
+                </View>
+              </View>
+
+              {isEmergencySOS ? (
+                <View className="mt-3 pt-3 border-t border-danger/20">
+                  <Text className="text-textDark text-[11px] font-bold uppercase tracking-wider mb-2">
+                    Select Specific Hazard Type:
+                  </Text>
+                  <View className="flex-row flex-wrap gap-2">
+                    {[
+                      { id: 'open_manhole', label: '🕳️ Open Manhole' },
+                      { id: 'live_wire', label: '⚡ Live Wire' },
+                      { id: 'road_cave_in', label: '⚠️ Road Cave-in' },
+                      { id: 'fallen_tree', label: '🌲 Fallen Tree' },
+                      { id: 'water_main_burst', label: '🌊 Water Burst' },
+                      { id: 'other', label: '🚨 Other Hazard' }
+                    ].map((item) => {
+                      const isSelected = hazardType === item.id;
+                      return (
+                        <TouchableOpacity
+                          key={item.id}
+                          onPress={() => setHazardType(item.id)}
+                          className={`px-3 py-1.5 rounded-xl border ${
+                            isSelected
+                              ? 'bg-danger border-danger'
+                              : 'bg-surface border-cardBorder'
+                          }`}
+                        >
+                          <Text
+                            className={`text-xs font-bold ${
+                              isSelected ? 'text-white' : 'text-textDark'
+                            }`}
+                          >
+                            {item.label}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+              ) : null}
+            </TouchableOpacity>
 
             {/* Anonymous Mode Toggle Card */}
             <TouchableOpacity
@@ -740,6 +863,20 @@ export default function ReportIssueScreen() {
         )}
 
       </View>
+
+      {/* Multilingual Voice Complaint Recorder Modal */}
+      <VoiceRecorderModal
+        visible={voiceModalVisible}
+        onClose={() => setVoiceModalVisible(false)}
+        onApplyTranscript={({ title: autoTitle, description: autoDesc, voiceAudioUri: vUri, voiceTranscript: vText }) => {
+          updateDraftReport({
+            title: title || autoTitle,
+            description: description ? `${description}\n\n[Voice Note]: ${autoDesc}` : autoDesc,
+            voiceAudioUri: vUri,
+            voiceTranscript: vText
+          });
+        }}
+      />
     </SafeAreaView>
   );
 }

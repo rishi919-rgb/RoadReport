@@ -74,6 +74,41 @@ const reportSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  // Emergency Road Hazard SOS Alert Network
+  isEmergencySOS: {
+    type: Boolean,
+    default: false
+  },
+  hazardType: {
+    type: String,
+    enum: ['open_manhole', 'fallen_tree', 'live_wire', 'flash_flood', 'road_cave_in', 'none'],
+    default: 'none'
+  },
+  // Voice note attachment & speech transcript
+  voiceAudioUri: {
+    type: String,
+    default: ''
+  },
+  voiceTranscript: {
+    type: String,
+    default: ''
+  },
+  // Municipal Authority / Resolver work order assignment
+  assignedEngineer: {
+    name: { type: String, default: '' },
+    department: { type: String, default: '' },
+    assignedAt: { type: Date },
+    slaDeadline: { type: Date }
+  },
+  // Verified Before vs After resolution proof
+  resolutionProof: {
+    afterPhotoUri: { type: String, default: '' },
+    resolvedAt: { type: Date },
+    resolverNotes: { type: String, default: '' },
+    department: { type: String, default: '' },
+    verifiedBy: { type: String, default: '' },
+    withinSLA: { type: Boolean, default: true }
+  },
   createdAt: {
     type: Date,
     default: Date.now
