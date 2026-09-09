@@ -8,6 +8,7 @@ import React, { memo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
+import { LEAFLET_CSS, LEAFLET_JS } from '../constants/leafletSource';
 
 const MiniMapPreview = ({ latitude = 23.0225, longitude = 72.5714, height = 180 }) => {
   const lat = parseFloat(latitude) || 23.0225;
@@ -19,9 +20,8 @@ const MiniMapPreview = ({ latitude = 23.0225, longitude = 72.5714, height = 180 
       <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
-        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
         <style>
+          ${LEAFLET_CSS}
           html, body, #map {
             margin: 0;
             padding: 0;
@@ -39,10 +39,12 @@ const MiniMapPreview = ({ latitude = 23.0225, longitude = 72.5714, height = 180 
             justify-content: center;
           }
         </style>
+        <script>
+          ${LEAFLET_JS}
+        </script>
       </head>
       <body>
         <div id="map"></div>
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js" onerror="this.onerror=null;this.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';"></script>
         <script>
           function initMiniMap() {
             var retries = 0;

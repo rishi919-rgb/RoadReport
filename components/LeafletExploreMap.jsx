@@ -7,6 +7,7 @@
 import React, { useRef, useImperativeHandle, forwardRef, useState, useEffect, memo } from 'react';
 import { View, StyleSheet, ActivityIndicator } from 'react-native';
 import { WebView } from 'react-native-webview';
+import { LEAFLET_CSS, LEAFLET_JS } from '../constants/leafletSource';
 
 const LeafletExploreMap = forwardRef(({
   reports = [],
@@ -86,9 +87,8 @@ const LeafletExploreMap = forwardRef(({
       <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
-        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
         <style>
+          ${LEAFLET_CSS}
           * { box-sizing: border-box; }
           html, body {
             margin: 0;
@@ -158,10 +158,12 @@ const LeafletExploreMap = forwardRef(({
             margin-top: -1px;
           }
         </style>
+        <script>
+          ${LEAFLET_JS}
+        </script>
       </head>
       <body>
         <div id="map"></div>
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js" onerror="this.onerror=null;this.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';"></script>
         <script>
           (function() {
             var map, voyagerLayer, satelliteLayer, currentLayer;

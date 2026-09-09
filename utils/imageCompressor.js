@@ -24,18 +24,28 @@ export const compressImage = async (uri) => {
   try {
     const actions = [
       {
-        resize: { width: 1024 } // Constrain width to 1024px (height scales proportionally)
+        resize: { width: 500 } // Constrain width to 500px for instant upload and lightweight base64 payload
       }
     ];
 
     const saveOptions = {
-      compress: 0.6, // Optimize quality for fast network transit
+      compress: 0.35, // High compression yielding ~25-40KB base64 payload (prevents HTTP 413)
       format: ImageManipulator.SaveFormat.JPEG,
       base64: true
     };
 
-    const result = await ImageManipulator.manipulateAsync(uri, actions, saveOptions);
-    console.log(`Image compressed successfully: ${result.width}x${result.height}`);
+    let result = await ImageManipulator.manipulateAsync(uri, actions, saveOptions);
+
+    // If payload exceeds 65KB, perform a second micro-compression pass to guarantee it never exceeds 100KB limit
+    if (result.base64 && result.base64.length > 65000) {
+      result = await ImageManipulator.manipulateAsync(
+        result.uri,
+        [{ resize: { width: 380 } }],
+        { compress: 0.25, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+      );
+    }
+
+    console.log(`Image compressed: ${result.width}x${result.height}, base64 len: ${result.base64?.length || 0}`);
     if (result.base64) {
       return `data:image/jpeg;base64,${result.base64}`;
     }

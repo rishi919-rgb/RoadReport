@@ -1,12 +1,14 @@
 /**
  * @file LeafletLocationPicker.jsx
  * @description Full-screen draggable pin Leaflet map picker.
- * Features bulletproof script polling, baseUrl injection, and automatic tile invalidate sizing.
+ * Uses bundled local Leaflet CSS and JS (zero network latency for core engine)
+ * and dual tile layers (Google Maps + OSM fallback).
  */
 
 import React, { useRef, useImperativeHandle, forwardRef, useState, memo } from 'react';
 import { View, StyleSheet, ActivityIndicator } from 'react-native';
 import { WebView } from 'react-native-webview';
+import { LEAFLET_CSS, LEAFLET_JS } from '../constants/leafletSource';
 
 const LeafletLocationPicker = forwardRef(({
   initialCoords = { latitude: 23.0225, longitude: 72.5714 },
@@ -48,9 +50,8 @@ const LeafletLocationPicker = forwardRef(({
       <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
-        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
         <style>
+          ${LEAFLET_CSS}
           * { box-sizing: border-box; }
           html, body {
             margin: 0;
@@ -105,142 +106,123 @@ const LeafletLocationPicker = forwardRef(({
             border-radius: 50%;
           }
         </style>
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js" onerror="this.onerror=null;this.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';"></script>
+        <script>
+          ${LEAFLET_JS}
+        </script>
       </head>
       <body>
         <div id="map"></div>
         <script>
-          function initPicker() {
-            var retries = 0;
-            function checkReady() {
-              if (typeof window.L !== 'undefined' && window.L.map) {
-                setupMap();
-              } else if (retries < 60) {
-                retries++;
-                setTimeout(checkReady, 80);
-              } else {
-                if (window.ReactNativeWebView) {
-                  window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'MAP_READY' }));
+          (function() {
+            try {
+              var map = L.map('map', {
+                center: [${initLat}, ${initLng}],
+                zoom: 16,
+                zoomControl: false,
+                tap: true,
+                attributionControl: false
+              });
+
+              // Primary tile layer: Google Maps roadmap
+              var tiles = L.tileLayer('https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+                subdomains: ['0', '1', '2', '3'],
+                maxZoom: 20
+              });
+
+              tiles.on('tileerror', function() {
+                L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+              });
+
+              tiles.addTo(map);
+
+              // Draggable Amber Pin SVG
+              var pinSvg = '<svg width="38" height="50" viewBox="0 0 38 50" fill="none" xmlns="http://www.w3.org/2000/svg">' +
+                '<defs>' +
+                '<linearGradient id="pinG" x1="0" y1="0" x2="0" y2="50" gradientUnits="userSpaceOnUse">' +
+                '<stop stop-color="#FB923C"/>' +
+                '<stop offset="1" stop-color="#EA580C"/>' +
+                '</linearGradient>' +
+                '</defs>' +
+                '<path d="M19 0C8.50659 0 0 8.50659 0 19C0 31 19 50 19 50C19 50 38 31 38 19C38 8.50659 29.4934 0 19 0Z" fill="url(#pinG)"/>' +
+                '<circle cx="19" cy="18" r="7" fill="#FFFFFF"/>' +
+                '<circle cx="19" cy="18" r="3.5" fill="#EA580C"/>' +
+                '</svg>';
+
+              var pinIcon = L.divIcon({
+                html: pinSvg,
+                className: 'amber-pin',
+                iconSize: [38, 50],
+                iconAnchor: [19, 50]
+              });
+
+              var pickerMarker = L.marker([${initLat}, ${initLng}], {
+                icon: pinIcon,
+                draggable: true,
+                autoPan: true
+              }).addTo(map);
+
+              function sendCoords(lat, lng) {
+                if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+                  window.ReactNativeWebView.postMessage(JSON.stringify({
+                    type: 'LOCATION_CHANGED',
+                    latitude: lat,
+                    longitude: lng
+                  }));
                 }
               }
-            }
 
-            function setupMap() {
-              try {
-                var map = L.map('map', {
-                  center: [${initLat}, ${initLng}],
-                  zoom: 16,
-                  zoomControl: false,
-                  tap: true,
-                  attributionControl: false
-                });
+              pickerMarker.on('dragend', function(e) {
+                var pos = pickerMarker.getLatLng();
+                sendCoords(pos.lat, pos.lng);
+              });
 
-                // Primary: Google Maps Roadmap
-                var tiles = L.tileLayer('https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
-                  subdomains: ['0', '1', '2', '3'],
-                  maxZoom: 20
-                });
+              map.on('click', function(e) {
+                pickerMarker.setLatLng(e.latlng);
+                sendCoords(e.latlng.lat, e.latlng.lng);
+              });
 
-                tiles.on('tileerror', function() {
-                  console.warn('Tile error, switching to OSM fallback');
-                  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
-                });
+              // Add nearby reports
+              var nearby = ${JSON.stringify(safeReports)};
+              var nearbyIcon = L.divIcon({
+                html: '<div class="nearby-badge"><div class="nearby-dot"></div></div>',
+                className: 'nearby-marker',
+                iconSize: [26, 26],
+                iconAnchor: [13, 13]
+              });
 
-                tiles.addTo(map);
-
-                // Draggable Amber Pin SVG
-                var pinSvg = '<svg width="38" height="50" viewBox="0 0 38 50" fill="none" xmlns="http://www.w3.org/2000/svg">' +
-                  '<defs>' +
-                  '<linearGradient id="pinG" x1="0" y1="0" x2="0" y2="50" gradientUnits="userSpaceOnUse">' +
-                  '<stop stop-color="#FB923C"/>' +
-                  '<stop offset="1" stop-color="#EA580C"/>' +
-                  '</linearGradient>' +
-                  '</defs>' +
-                  '<path d="M19 0C8.50659 0 0 8.50659 0 19C0 31 19 50 19 50C19 50 38 31 38 19C38 8.50659 29.4934 0 19 0Z" fill="url(#pinG)"/>' +
-                  '<circle cx="19" cy="18" r="7" fill="#FFFFFF"/>' +
-                  '<circle cx="19" cy="18" r="3.5" fill="#EA580C"/>' +
-                  '</svg>';
-
-                var pinIcon = L.divIcon({
-                  html: pinSvg,
-                  className: 'amber-pin',
-                  iconSize: [38, 50],
-                  iconAnchor: [19, 50]
-                });
-
-                var pickerMarker = L.marker([${initLat}, ${initLng}], {
-                  icon: pinIcon,
-                  draggable: true,
-                  autoPan: true
-                }).addTo(map);
-
-                function sendCoords(lat, lng) {
-                  if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
-                    window.ReactNativeWebView.postMessage(JSON.stringify({
-                      type: 'LOCATION_CHANGED',
-                      latitude: lat,
-                      longitude: lng
-                    }));
-                  }
+              nearby.forEach(function(item) {
+                if (item.lat && item.lng) {
+                  L.marker([item.lat, item.lng], { icon: nearbyIcon })
+                    .addTo(map)
+                    .bindPopup('<b>' + item.title + '</b><br><span style="color:#F97316;font-size:11px;">Existing Report</span>');
                 }
+              });
 
-                pickerMarker.on('dragend', function(e) {
-                  var pos = pickerMarker.getLatLng();
-                  sendCoords(pos.lat, pos.lng);
-                });
+              window.setPickerLocation = function(lat, lng) {
+                pickerMarker.setLatLng([lat, lng]);
+                map.flyTo([lat, lng], Math.max(map.getZoom(), 16), { duration: 0.8 });
+                sendCoords(lat, lng);
+              };
 
-                map.on('click', function(e) {
-                  pickerMarker.setLatLng(e.latlng);
-                  sendCoords(e.latlng.lat, e.latlng.lng);
-                });
+              // Force layout dimension updates
+              setTimeout(function() { map.invalidateSize(); }, 80);
+              setTimeout(function() { map.invalidateSize(); }, 300);
+              setTimeout(function() { map.invalidateSize(); }, 800);
 
-                // Add nearby reports
-                var nearby = ${JSON.stringify(safeReports)};
-                var nearbyIcon = L.divIcon({
-                  html: '<div class="nearby-badge"><div class="nearby-dot"></div></div>',
-                  className: 'nearby-marker',
-                  iconSize: [26, 26],
-                  iconAnchor: [13, 13]
-                });
+              window.addEventListener('resize', function() {
+                map.invalidateSize();
+              });
 
-                nearby.forEach(function(item) {
-                  if (item.lat && item.lng) {
-                    L.marker([item.lat, item.lng], { icon: nearbyIcon })
-                      .addTo(map)
-                      .bindPopup('<b>' + item.title + '</b><br><span style="color:#F97316;font-size:11px;">Existing Report</span>');
-                  }
-                });
-
-                window.setPickerLocation = function(lat, lng) {
-                  pickerMarker.setLatLng([lat, lng]);
-                  map.flyTo([lat, lng], Math.max(map.getZoom(), 16), { duration: 0.8 });
-                  sendCoords(lat, lng);
-                };
-
-                // CRITICAL: Leaflet dimension invalidation to ensure immediate full rendering
-                setTimeout(function() { map.invalidateSize(); }, 150);
-                setTimeout(function() { map.invalidateSize(); }, 400);
-                setTimeout(function() { map.invalidateSize(); }, 900);
-
-                window.addEventListener('resize', function() {
-                  map.invalidateSize();
-                });
-
-                if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
-                  window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'MAP_READY' }));
-                }
-              } catch (err) {
-                console.error('Picker init error:', err);
-                if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
-                  window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'MAP_READY' }));
-                }
+              if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+                window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'MAP_READY' }));
+              }
+            } catch (err) {
+              console.error('Picker init error:', err);
+              if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+                window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'MAP_READY' }));
               }
             }
-
-            checkReady();
-          }
-
-          initPicker();
+          })();
         </script>
       </body>
     </html>
@@ -267,7 +249,7 @@ const LeafletLocationPicker = forwardRef(({
       <WebView
         ref={webViewRef}
         originWhitelist={['*']}
-        source={{ html: htmlContent, baseUrl: 'https://cdnjs.cloudflare.com' }}
+        source={{ html: htmlContent }}
         scrollEnabled={false}
         showsHorizontalScrollIndicator={false}
         showsVerticalScrollIndicator={false}
@@ -279,9 +261,7 @@ const LeafletLocationPicker = forwardRef(({
         androidHardwareAccelerationDisabled={false}
         androidLayerType="hardware"
         onMessage={handleMessage}
-        onLoadEnd={() => {
-          setTimeout(() => setMapLoaded(true), 300);
-        }}
+        onLoadEnd={() => setMapLoaded(true)}
         style={styles.webView}
       />
 

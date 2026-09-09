@@ -22,8 +22,9 @@ const app = express();
 // Middleware: Enable Cross-Origin Resource Sharing (allows React Native app to make API calls)
 app.use(cors());
 
-// Middleware: Parse incoming requests with JSON payloads (replaces body-parser)
-app.use(express.json());
+// Middleware: Parse incoming requests with JSON payloads (supports base64 image data)
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // Mount API endpoint routers
 app.use('/api/auth', authRoutes);
