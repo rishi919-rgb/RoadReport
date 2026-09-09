@@ -13,7 +13,10 @@ const {
   updateReport,
   deleteReport,
   updateReportStatus,
-  toggleUpvoteReport
+  toggleUpvoteReport,
+  getEmergencyAlerts,
+  assignWorkOrder,
+  resolveReportWithProof
 } = require('../controllers/reportController');
 const { protect } = require('../middleware/authMiddleware');
 

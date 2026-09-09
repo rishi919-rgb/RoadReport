@@ -37,6 +37,7 @@ export default function ReportDetailsScreen() {
   const [upvotesCount, setUpvotesCount] = useState(0);
   const [isUpvoted, setIsUpvoted] = useState(false);
   const [isUpvoting, setIsUpvoting] = useState(false);
+  const [mediaLoadError, setMediaLoadError] = useState(false);
 
   useEffect(() => {
     const fetchDetail = async () => {
@@ -158,12 +159,13 @@ export default function ReportDetailsScreen() {
             elevation: 3,
           }}
         >
-          {report.media && report.media.length > 0 ? (
+          {report.media && report.media.length > 0 && !mediaLoadError ? (
             <View className="w-full h-full relative">
               <Image
                 source={{ uri: report.media[0] }}
                 className="w-full h-full"
                 resizeMode="cover"
+                onError={() => setMediaLoadError(true)}
               />
               {(report.media[0].toLowerCase().endsWith('.mp4') ||
                 report.media[0].toLowerCase().endsWith('.mov') ||
@@ -180,9 +182,10 @@ export default function ReportDetailsScreen() {
               )}
             </View>
           ) : (
-            <View className="w-full h-full items-center justify-center bg-surfaceAlt">
-              <CategoryIcon categoryId={report.category} size={48} color="#F97316" />
-              <Text className="text-textMuted text-xs mt-2 font-medium">No media evidence attached</Text>
+            <View className="w-full h-full items-center justify-center bg-primaryLight/40 border border-primaryMid/30">
+              <CategoryIcon categoryId={report.category} size={52} color="#F97316" />
+              <Text className="text-textDark font-bold text-xs mt-3">{catDetails.label}</Text>
+              <Text className="text-textMuted text-[11px] mt-0.5 font-medium">Evidence captured via mobile device</Text>
             </View>
           )}
         </View>

@@ -29,12 +29,16 @@ export const compressImage = async (uri) => {
     ];
 
     const saveOptions = {
-      compress: 0.7, // Reduce quality to 70% (JPEG compression)
-      format: ImageManipulator.SaveFormat.JPEG
+      compress: 0.6, // Optimize quality for fast network transit
+      format: ImageManipulator.SaveFormat.JPEG,
+      base64: true
     };
 
     const result = await ImageManipulator.manipulateAsync(uri, actions, saveOptions);
     console.log(`Image compressed successfully: ${result.width}x${result.height}`);
+    if (result.base64) {
+      return `data:image/jpeg;base64,${result.base64}`;
+    }
     return result.uri;
   } catch (error) {
     console.error('Failed to compress image:', error.message);

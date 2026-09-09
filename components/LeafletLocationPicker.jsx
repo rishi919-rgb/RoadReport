@@ -48,6 +48,7 @@ const LeafletLocationPicker = forwardRef(({
       <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
         <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
         <style>
           html, body, #map {
@@ -101,7 +102,7 @@ const LeafletLocationPicker = forwardRef(({
       </head>
       <body>
         <div id="map"></div>
-        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js" onerror="this.onerror=null;this.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';"></script>
         <script>
           (function() {
             try {
@@ -230,6 +231,11 @@ const LeafletLocationPicker = forwardRef(({
         showsVerticalScrollIndicator={false}
         javaScriptEnabled={true}
         domStorageEnabled={true}
+        mixedContentMode="always"
+        allowFileAccess={true}
+        cacheEnabled={true}
+        androidHardwareAccelerationDisabled={false}
+        androidLayerType="hardware"
         onMessage={handleMessage}
         onLoadEnd={() => setMapLoaded(true)}
         style={styles.webView}

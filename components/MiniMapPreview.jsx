@@ -19,6 +19,7 @@ const MiniMapPreview = ({ latitude = 23.0225, longitude = 72.5714, height = 180 
       <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
         <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
         <style>
           html, body, #map {
@@ -41,7 +42,7 @@ const MiniMapPreview = ({ latitude = 23.0225, longitude = 72.5714, height = 180 
       </head>
       <body>
         <div id="map"></div>
-        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js" onerror="this.onerror=null;this.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';"></script>
         <script>
           try {
             var map = L.map('map', {
@@ -94,6 +95,11 @@ const MiniMapPreview = ({ latitude = 23.0225, longitude = 72.5714, height = 180 
         showsVerticalScrollIndicator={false}
         javaScriptEnabled={true}
         domStorageEnabled={true}
+        mixedContentMode="always"
+        allowFileAccess={true}
+        cacheEnabled={true}
+        androidHardwareAccelerationDisabled={false}
+        androidLayerType="hardware"
         style={{ flex: 1, backgroundColor: '#F5F0EB' }}
       />
       

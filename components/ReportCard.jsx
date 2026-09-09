@@ -15,17 +15,21 @@ export default function ReportCard({ report, onPress }) {
   const { title, location, media, status, category, createdAt } = report;
   const address = location?.address || 'Unknown location';
   
+  const [imageError, setImageError] = React.useState(false);
   const categoryDetails = CATEGORIES.find(c => c.id === category) || CATEGORIES[CATEGORIES.length - 1];
 
-  const renderThumbnail = media && media.length > 0 ? (
+  const hasValidMedia = media && media.length > 0 && !imageError;
+
+  const renderThumbnail = hasValidMedia ? (
     <Image
       source={{ uri: media[0] }}
       className="w-20 h-20 rounded-xl"
       resizeMode="cover"
+      onError={() => setImageError(true)}
     />
   ) : (
-    <View className="w-20 h-20 bg-surfaceAlt rounded-xl items-center justify-center">
-      <CategoryIcon categoryId={category} size={26} color="#F97316" />
+    <View className="w-20 h-20 bg-primaryLight border border-primaryMid/40 rounded-xl items-center justify-center">
+      <CategoryIcon categoryId={category} size={28} color="#F97316" />
     </View>
   );
 
