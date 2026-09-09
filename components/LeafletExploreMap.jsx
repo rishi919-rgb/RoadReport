@@ -18,19 +18,30 @@ const LeafletExploreMap = forwardRef(({
   const webViewRef = useRef(null);
   const [mapLoaded, setMapLoaded] = useState(false);
 
+  // Safety fallback: never leave the screen covered by loading overlay for more than 2 seconds
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setMapLoaded(true);
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, []);
+
   // Serialize and sanitize reports for WebView
-  const safeReports = reports.map((r) => {
-    if (!r.location || !r.location.latitude || !r.location.longitude) return null;
+  const safeReports = (reports || []).map((r) => {
+    if (!r || !r.location) return null;
+    const lat = parseFloat(r.location.latitude);
+    const lng = parseFloat(r.location.longitude);
+    if (isNaN(lat) || isNaN(lng)) return null;
     return {
-      id: r._id,
-      title: String(r.title || 'Civic Issue').replace(/'/g, "\\'"),
-      description: String(r.description || '').replace(/'/g, "\\'"),
+      id: String(r._id || Math.random()),
+      title: String(r.title || 'Civic Issue').slice(0, 80),
+      description: String(r.description || '').slice(0, 200),
       category: r.category || 'other',
       status: r.status || 'reported',
       severity: r.severity || 'medium',
-      address: String(r.location.address || '').replace(/'/g, "\\'"),
-      lat: parseFloat(r.location.latitude),
-      lng: parseFloat(r.location.longitude)
+      address: String(r.location.address || '').slice(0, 100),
+      lat: lat,
+      lng: lng
     };
   }).filter(Boolean);
 
@@ -38,22 +49,22 @@ const LeafletExploreMap = forwardRef(({
   useImperativeHandle(ref, () => ({
     recenter: () => {
       if (webViewRef.current) {
-        webViewRef.current.injectJavaScript('window.fitAllMarkers(); true;');
+        webViewRef.current.injectJavaScript('window.fitAllMarkers && window.fitAllMarkers(); true;');
       }
     },
     setLayer: (type) => {
       if (webViewRef.current) {
-        webViewRef.current.injectJavaScript(`window.setMapLayer('${type}'); true;`);
+        webViewRef.current.injectJavaScript(`window.setMapLayer && window.setMapLayer('${type}'); true;`);
       }
     },
     filterCategory: (catId) => {
       if (webViewRef.current) {
-        webViewRef.current.injectJavaScript(`window.filterCategory('${catId}'); true;`);
+        webViewRef.current.injectJavaScript(`window.filterCategory && window.filterCategory('${catId}'); true;`);
       }
     },
     flyTo: (lat, lng) => {
       if (webViewRef.current) {
-        webViewRef.current.injectJavaScript(`window.flyToCoords(${lat}, ${lng}); true;`);
+        webViewRef.current.injectJavaScript(`window.flyToCoords && window.flyToCoords(${lat}, ${lng}); true;`);
       }
     }
   }));
@@ -61,14 +72,14 @@ const LeafletExploreMap = forwardRef(({
   // Update map layer when mapType prop changes
   useEffect(() => {
     if (mapLoaded && webViewRef.current) {
-      webViewRef.current.injectJavaScript(`window.setMapLayer('${mapType}'); true;`);
+      webViewRef.current.injectJavaScript(`window.setMapLayer && window.setMapLayer('${mapType}'); true;`);
     }
   }, [mapType, mapLoaded]);
 
   // Update category filter when selectedCategory prop changes
   useEffect(() => {
     if (mapLoaded && webViewRef.current) {
-      webViewRef.current.injectJavaScript(`window.filterCategory('${selectedCategory}'); true;`);
+      webViewRef.current.injectJavaScript(`window.filterCategory && window.filterCategory('${selectedCategory}'); true;`);
     }
   }, [selectedCategory, mapLoaded]);
 
@@ -76,7 +87,7 @@ const LeafletExploreMap = forwardRef(({
   useEffect(() => {
     if (mapLoaded && webViewRef.current) {
       const serialized = JSON.stringify(safeReports);
-      webViewRef.current.injectJavaScript(`window.updateReports(${serialized}); true;`);
+      webViewRef.current.injectJavaScript(`window.updateReports && window.updateReports(${serialized}); true;`);
     }
   }, [reports, mapLoaded]);
 
@@ -86,6 +97,7 @@ const LeafletExploreMap = forwardRef(({
       <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
         <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
         <style>
           html, body, #map {
@@ -148,7 +160,7 @@ const LeafletExploreMap = forwardRef(({
       </head>
       <body>
         <div id="map"></div>
-        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js" onerror="this.onerror=null;this.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';"></script>
         <script>
           (function() {
             var map, voyagerLayer, satelliteLayer, currentLayer;
@@ -168,99 +180,148 @@ const LeafletExploreMap = forwardRef(({
               'road': '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M19.44 21L14 3h-4L4.56 21h3.31l1.53-5h5.2l1.53 5h3.31zM11 13l1-3.33L13 13h-2z"/></svg>',
               'pothole': '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>',
               'water': '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>',
+              'water_leak': '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>',
               'streetlight': '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9v1zm3-19C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7z"/></svg>',
               'garbage': '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>',
               'traffic': '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z"/></svg>',
               'other': '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>'
             };
 
-            function initMap() {
-              map = L.map('map', {
-                center: [23.0225, 72.5714],
-                zoom: 13,
-                zoomControl: false,
-                attributionControl: false,
-                tap: true
-              });
+            function escapeHtml(str) {
+              if (!str) return '';
+              return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+            }
 
-              voyagerLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-                subdomains: 'abcd',
-                maxZoom: 19
-              });
-
-              satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-                maxZoom: 19
-              });
-
-              currentLayer = voyagerLayer;
-              currentLayer.addTo(map);
-
-              map.on('click', function(e) {
+            var retries = 0;
+            function checkReady() {
+              if (typeof window.L !== 'undefined' && window.L.map) {
+                initMap();
+              } else if (retries < 120) {
+                retries++;
+                setTimeout(checkReady, 50);
+              } else {
                 if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
-                  window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'DESELECT' }));
+                  window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'MAP_READY' }));
                 }
-              });
+              }
+            }
 
-              renderMarkers();
+            function initMap() {
+              try {
+                map = L.map('map', {
+                  center: [23.0225, 72.5714],
+                  zoom: 13,
+                  zoomControl: false,
+                  attributionControl: false,
+                  tap: true
+                });
 
-              if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
-                window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'MAP_READY' }));
+                voyagerLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+                  subdomains: 'abcd',
+                  maxZoom: 19
+                });
+
+                voyagerLayer.on('tileerror', function() {
+                  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+                });
+
+                satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                  maxZoom: 19
+                });
+
+                currentLayer = voyagerLayer;
+                currentLayer.addTo(map);
+
+                map.on('click', function(e) {
+                  if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+                    window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'DESELECT' }));
+                  }
+                });
+
+                renderMarkers();
+
+                setTimeout(function() { if (map) map.invalidateSize(); }, 150);
+                setTimeout(function() { if (map) map.invalidateSize(); }, 500);
+
+                window.addEventListener('resize', function() {
+                  if (map) map.invalidateSize();
+                });
+
+                if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+                  window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'MAP_READY' }));
+                }
+              } catch (err) {
+                console.error('ExploreMap init error:', err);
+                if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+                  window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'MAP_READY' }));
+                }
               }
             }
 
             function renderMarkers() {
-              // Clear old markers
-              markers.forEach(function(m) { map.removeLayer(m); });
-              markers = [];
+              try {
+                // Clear old markers
+                markers.forEach(function(m) { map.removeLayer(m); });
+                markers = [];
 
-              var bounds = [];
+                var bounds = [];
 
-              allReports.forEach(function(report) {
-                if (!report.lat || !report.lng) return;
-                if (currentCategory !== 'all' && report.category !== currentCategory) return;
+                allReports.forEach(function(report) {
+                  if (!report.lat || !report.lng) return;
+                  if (currentCategory !== 'all' && report.category !== currentCategory) return;
 
-                var color = STATUS_COLORS[report.status] || '#F97316';
-                var iconSvg = CATEGORY_ICONS[report.category] || CATEGORY_ICONS['other'];
+                  var color = STATUS_COLORS[report.status] || '#F97316';
+                  var iconSvg = CATEGORY_ICONS[report.category] || CATEGORY_ICONS['other'];
+                  var cleanTitle = escapeHtml(report.title || 'Civic Issue');
 
-                var html = '<div class="custom-marker">' +
-                  '<div class="marker-card" style="border-color:' + color + ';">' +
-                  '<div class="marker-icon-box" style="background:' + color + '15; color:' + color + ';">' +
-                  iconSvg +
-                  '</div>' +
-                  '<div class="marker-title">' + report.title + '</div>' +
-                  '</div>' +
-                  '<div class="marker-arrow" style="border-top-color:' + color + ';"></div>' +
-                  '</div>';
+                  var html = '<div class="custom-marker">' +
+                    '<div class="marker-card" style="border-color:' + color + ';">' +
+                    '<div class="marker-icon-box" style="background:' + color + '15; color:' + color + ';">' +
+                    iconSvg +
+                    '</div>' +
+                    '<div class="marker-title">' + cleanTitle + '</div>' +
+                    '</div>' +
+                    '<div class="marker-arrow" style="border-top-color:' + color + ';"></div>' +
+                    '</div>';
 
-                var icon = L.divIcon({
-                  html: html,
-                  className: '',
-                  iconSize: [120, 36],
-                  iconAnchor: [60, 36]
+                  var icon = L.divIcon({
+                    html: html,
+                    className: '',
+                    iconSize: [120, 36],
+                    iconAnchor: [60, 36]
+                  });
+
+                  var marker = L.marker([report.lat, report.lng], { icon: icon }).addTo(map);
+
+                  marker.on('click', function(e) {
+                    L.DomEvent.stopPropagation(e);
+                    if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+                      window.ReactNativeWebView.postMessage(JSON.stringify({
+                        type: 'SELECT_REPORT',
+                        id: report.id
+                      }));
+                    }
+                  });
+
+                  markers.push(marker);
+                  bounds.push([report.lat, report.lng]);
                 });
 
-                var marker = L.marker([report.lat, report.lng], { icon: icon }).addTo(map);
-
-                marker.on('click', function(e) {
-                  L.DomEvent.stopPropagation(e);
-                  if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
-                    window.ReactNativeWebView.postMessage(JSON.stringify({
-                      type: 'SELECT_REPORT',
-                      id: report.id
-                    }));
-                  }
-                });
-
-                markers.push(marker);
-                bounds.push([report.lat, report.lng]);
-              });
-
-              if (bounds.length > 0) {
-                map.fitBounds(bounds, { padding: [60, 60], maxZoom: 15 });
+                if (bounds.length > 0) {
+                  map.fitBounds(bounds, { padding: [60, 60], maxZoom: 15 });
+                }
+              } catch (e) {
+                console.error('renderMarkers error:', e);
               }
             }
 
             window.setMapLayer = function(type) {
+              if (!map) return;
               if (type === 'hybrid' || type === 'satellite') {
                 if (currentLayer !== satelliteLayer) {
                   map.removeLayer(currentLayer);
@@ -282,11 +343,12 @@ const LeafletExploreMap = forwardRef(({
             };
 
             window.updateReports = function(newReports) {
-              allReports = newReports;
+              allReports = newReports || [];
               renderMarkers();
             };
 
             window.fitAllMarkers = function() {
+              if (!map) return;
               if (markers.length > 0) {
                 var group = L.featureGroup(markers);
                 map.fitBounds(group.getBounds().pad(0.15));
@@ -296,10 +358,14 @@ const LeafletExploreMap = forwardRef(({
             };
 
             window.flyToCoords = function(lat, lng) {
-              map.flyTo([lat, lng], 16, { duration: 0.8 });
+              if (map) map.flyTo([lat, lng], 16, { duration: 0.8 });
             };
 
-            initMap();
+            if (document.readyState === 'loading') {
+              document.addEventListener('DOMContentLoaded', checkReady);
+            } else {
+              checkReady();
+            }
           })();
         </script>
       </body>
@@ -312,7 +378,7 @@ const LeafletExploreMap = forwardRef(({
       if (data.type === 'MAP_READY') {
         setMapLoaded(true);
       } else if (data.type === 'SELECT_REPORT') {
-        const found = reports.find((r) => r._id === data.id);
+        const found = (reports || []).find((r) => r._id === data.id);
         if (found && onSelectReport) {
           onSelectReport(found);
         }
@@ -329,14 +395,20 @@ const LeafletExploreMap = forwardRef(({
       <WebView
         ref={webViewRef}
         originWhitelist={['*']}
-        source={{ html: htmlContent }}
+        source={{ html: htmlContent, baseUrl: 'https://cdnjs.cloudflare.com' }}
         scrollEnabled={false}
         showsHorizontalScrollIndicator={false}
         showsVerticalScrollIndicator={false}
         javaScriptEnabled={true}
         domStorageEnabled={true}
+        mixedContentMode="always"
+        allowFileAccess={true}
+        cacheEnabled={true}
+        androidHardwareAccelerationDisabled={false}
+        androidLayerType="hardware"
         onMessage={handleMessage}
         onLoadEnd={() => setMapLoaded(true)}
+        onError={() => setMapLoaded(true)}
         style={styles.webView}
       />
 

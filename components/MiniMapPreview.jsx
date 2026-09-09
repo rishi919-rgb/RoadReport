@@ -19,6 +19,7 @@ const MiniMapPreview = ({ latitude = 23.0225, longitude = 72.5714, height = 180 
       <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
         <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
         <style>
           html, body, #map {
@@ -41,44 +42,70 @@ const MiniMapPreview = ({ latitude = 23.0225, longitude = 72.5714, height = 180 
       </head>
       <body>
         <div id="map"></div>
-        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js" onerror="this.onerror=null;this.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';"></script>
         <script>
-          try {
-            var map = L.map('map', {
-              center: [${lat}, ${lng}],
-              zoom: 16,
-              zoomControl: false,
-              dragging: false,
-              touchZoom: false,
-              doubleClickZoom: false,
-              scrollWheelZoom: false,
-              boxZoom: false,
-              keyboard: false,
-              attributionControl: false
-            });
+          (function() {
+            var retries = 0;
+            function checkReady() {
+              if (typeof window.L !== 'undefined' && window.L.map) {
+                initMiniMap();
+              } else if (retries < 100) {
+                retries++;
+                setTimeout(checkReady, 50);
+              }
+            }
 
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-              subdomains: 'abcd',
-              maxZoom: 19
-            }).addTo(map);
+            function initMiniMap() {
+              try {
+                var map = L.map('map', {
+                  center: [${lat}, ${lng}],
+                  zoom: 16,
+                  zoomControl: false,
+                  dragging: false,
+                  touchZoom: false,
+                  doubleClickZoom: false,
+                  scrollWheelZoom: false,
+                  boxZoom: false,
+                  keyboard: false,
+                  attributionControl: false
+                });
 
-            var pinSvg = '<svg width="30" height="40" viewBox="0 0 30 40" fill="none" xmlns="http://www.w3.org/2000/svg">' +
-              '<path d="M15 0C6.71573 0 0 6.71573 0 15C0 24.5 15 40 15 40C15 40 30 24.5 30 15C30 6.71573 23.2843 0 15 0Z" fill="#F97316"/>' +
-              '<circle cx="15" cy="14" r="5.5" fill="#FFFFFF"/>' +
-              '<circle cx="15" cy="14" r="2.5" fill="#EA580C"/>' +
-              '</svg>';
+                var voyagerLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+                  subdomains: 'abcd',
+                  maxZoom: 19
+                }).addTo(map);
 
-            var icon = L.divIcon({
-              html: pinSvg,
-              className: 'amber-pin',
-              iconSize: [30, 40],
-              iconAnchor: [15, 40]
-            });
+                voyagerLayer.on('tileerror', function() {
+                  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+                });
 
-            L.marker([${lat}, ${lng}], { icon: icon }).addTo(map);
-          } catch (e) {
-            console.error('MiniMap error:', e);
-          }
+                var pinSvg = '<svg width="30" height="40" viewBox="0 0 30 40" fill="none" xmlns="http://www.w3.org/2000/svg">' +
+                  '<path d="M15 0C6.71573 0 0 6.71573 0 15C0 24.5 15 40 15 40C15 40 30 24.5 30 15C30 6.71573 23.2843 0 15 0Z" fill="#F97316"/>' +
+                  '<circle cx="15" cy="14" r="5.5" fill="#FFFFFF"/>' +
+                  '<circle cx="15" cy="14" r="2.5" fill="#EA580C"/>' +
+                  '</svg>';
+
+                var icon = L.divIcon({
+                  html: pinSvg,
+                  className: 'amber-pin',
+                  iconSize: [30, 40],
+                  iconAnchor: [15, 40]
+                });
+
+                L.marker([${lat}, ${lng}], { icon: icon }).addTo(map);
+
+                setTimeout(function() { if (map) map.invalidateSize(); }, 150);
+              } catch (e) {
+                console.error('MiniMap error:', e);
+              }
+            }
+
+            if (document.readyState === 'loading') {
+              document.addEventListener('DOMContentLoaded', checkReady);
+            } else {
+              checkReady();
+            }
+          })();
         </script>
       </body>
     </html>
@@ -88,12 +115,17 @@ const MiniMapPreview = ({ latitude = 23.0225, longitude = 72.5714, height = 180 
     <View style={[{ height, width: '100%' }, styles.container]}>
       <WebView
         originWhitelist={['*']}
-        source={{ html: htmlContent }}
+        source={{ html: htmlContent, baseUrl: 'https://cdnjs.cloudflare.com' }}
         scrollEnabled={false}
         showsHorizontalScrollIndicator={false}
         showsVerticalScrollIndicator={false}
         javaScriptEnabled={true}
         domStorageEnabled={true}
+        mixedContentMode="always"
+        allowFileAccess={true}
+        cacheEnabled={true}
+        androidHardwareAccelerationDisabled={false}
+        androidLayerType="hardware"
         style={{ flex: 1, backgroundColor: '#F5F0EB' }}
       />
       
