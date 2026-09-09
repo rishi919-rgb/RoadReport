@@ -268,17 +268,6 @@ export default function ReportIssueScreen() {
   };
 
   const handleSubmitReport = async () => {
-    if (!bypassDuplicate) {
-      setIsSubmitting(true);
-      const isDuplicate = await handleCheckDuplicates();
-      setIsSubmitting(false);
-      
-      if (isDuplicate) {
-        setStep(5);
-        return;
-      }
-    }
-
     setIsSubmitting(true);
 
     try {

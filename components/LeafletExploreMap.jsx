@@ -1,13 +1,12 @@
 /**
  * @file LeafletExploreMap.jsx
  * @description Interactive Leaflet exploration map for civic issues with dual tile support (Road & Satellite).
- * Replaces native Google Maps with a reliable, API-key-free Leaflet implementation.
+ * Proven, rock-solid map from working APK build.
  */
 
 import React, { useRef, useImperativeHandle, forwardRef, useState, useEffect, memo } from 'react';
 import { View, StyleSheet, ActivityIndicator } from 'react-native';
 import { WebView } from 'react-native-webview';
-import { LEAFLET_CSS, LEAFLET_JS } from '../constants/leafletSource';
 
 const LeafletExploreMap = forwardRef(({
   reports = [],
@@ -87,23 +86,11 @@ const LeafletExploreMap = forwardRef(({
       <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
         <style>
-          ${LEAFLET_CSS}
-          * { box-sizing: border-box; }
-          html, body {
+          html, body, #map {
             margin: 0;
             padding: 0;
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-            background-color: #F5F0EB;
-          }
-          #map {
-            position: absolute;
-            top: 0;
-            bottom: 0;
-            left: 0;
-            right: 0;
             width: 100%;
             height: 100%;
             background-color: #F5F0EB;
@@ -158,12 +145,10 @@ const LeafletExploreMap = forwardRef(({
             margin-top: -1px;
           }
         </style>
-        <script>
-          ${LEAFLET_JS}
-        </script>
       </head>
       <body>
         <div id="map"></div>
+        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
         <script>
           (function() {
             var map, voyagerLayer, satelliteLayer, currentLayer;
@@ -189,81 +174,39 @@ const LeafletExploreMap = forwardRef(({
               'other': '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>'
             };
 
-            function bootExploreMap() {
-              var retries = 0;
-              function checkReady() {
-                if (typeof window.L !== 'undefined' && window.L.map) {
-                  initMap();
-                } else if (retries < 60) {
-                  retries++;
-                  setTimeout(checkReady, 80);
-                } else {
-                  if (window.ReactNativeWebView) {
-                    window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'MAP_READY' }));
-                  }
+            function initMap() {
+              map = L.map('map', {
+                center: [23.0225, 72.5714],
+                zoom: 13,
+                zoomControl: false,
+                attributionControl: false,
+                tap: true
+              });
+
+              voyagerLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+                subdomains: 'abcd',
+                maxZoom: 19
+              });
+
+              satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                maxZoom: 19
+              });
+
+              currentLayer = voyagerLayer;
+              currentLayer.addTo(map);
+
+              map.on('click', function(e) {
+                if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+                  window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'DESELECT' }));
                 }
+              });
+
+              renderMarkers();
+
+              if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+                window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'MAP_READY' }));
               }
-
-              function initMap() {
-                try {
-                  map = L.map('map', {
-                    center: [23.0225, 72.5714],
-                    zoom: 13,
-                    zoomControl: false,
-                    attributionControl: false,
-                    tap: true
-                  });
-
-                  voyagerLayer = L.tileLayer('https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
-                    subdomains: ['0', '1', '2', '3'],
-                    maxZoom: 20
-                  });
-
-                  voyagerLayer.on('tileerror', function() {
-                    console.warn('Google tile error, fallback to OSM');
-                    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
-                  });
-
-                  satelliteLayer = L.tileLayer('https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
-                    subdomains: ['0', '1', '2', '3'],
-                    maxZoom: 20
-                  });
-
-                  currentLayer = voyagerLayer;
-                  currentLayer.addTo(map);
-
-                  map.on('click', function(e) {
-                    if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
-                      window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'DESELECT' }));
-                    }
-                  });
-
-                  renderMarkers();
-
-                  // CRITICAL: Leaflet dimension invalidation to ensure full viewport fill
-                  setTimeout(function() { map.invalidateSize(); }, 150);
-                  setTimeout(function() { map.invalidateSize(); }, 400);
-                  setTimeout(function() { map.invalidateSize(); }, 1000);
-
-                  window.addEventListener('resize', function() {
-                    map.invalidateSize();
-                  });
-
-                  if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
-                    window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'MAP_READY' }));
-                  }
-                } catch (e) {
-                  console.error('ExploreMap init error:', e);
-                  if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
-                    window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'MAP_READY' }));
-                  }
-                }
-              }
-
-              checkReady();
             }
-
-            bootExploreMap();
 
             function renderMarkers() {
               // Clear old markers
@@ -353,8 +296,10 @@ const LeafletExploreMap = forwardRef(({
             };
 
             window.flyToCoords = function(lat, lng) {
-              if (map) map.flyTo([lat, lng], 16, { duration: 0.8 });
+              map.flyTo([lat, lng], 16, { duration: 0.8 });
             };
+
+            initMap();
           })();
         </script>
       </body>
@@ -384,17 +329,12 @@ const LeafletExploreMap = forwardRef(({
       <WebView
         ref={webViewRef}
         originWhitelist={['*']}
-        source={{ html: htmlContent, baseUrl: 'https://cdnjs.cloudflare.com' }}
+        source={{ html: htmlContent }}
         scrollEnabled={false}
         showsHorizontalScrollIndicator={false}
         showsVerticalScrollIndicator={false}
         javaScriptEnabled={true}
         domStorageEnabled={true}
-        mixedContentMode="always"
-        allowFileAccess={true}
-        cacheEnabled={true}
-        androidHardwareAccelerationDisabled={false}
-        androidLayerType="hardware"
         onMessage={handleMessage}
         onLoadEnd={() => setMapLoaded(true)}
         style={styles.webView}

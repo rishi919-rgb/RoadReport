@@ -1,14 +1,12 @@
 /**
  * @file LeafletLocationPicker.jsx
- * @description Full-screen draggable pin Leaflet map picker.
- * Uses bundled local Leaflet CSS and JS (zero network latency for core engine)
- * and dual tile layers (Google Maps + OSM fallback).
+ * @description Full-screen map location picker powered by Leaflet and CartoDB Voyager tiles.
+ * Proven, rock-solid map picker from working APK build.
  */
 
 import React, { useRef, useImperativeHandle, forwardRef, useState, memo } from 'react';
 import { View, StyleSheet, ActivityIndicator } from 'react-native';
 import { WebView } from 'react-native-webview';
-import { LEAFLET_CSS, LEAFLET_JS } from '../constants/leafletSource';
 
 const LeafletLocationPicker = forwardRef(({
   initialCoords = { latitude: 23.0225, longitude: 72.5714 },
@@ -21,7 +19,6 @@ const LeafletLocationPicker = forwardRef(({
   const initLat = parseFloat(initialCoords?.latitude) || 23.0225;
   const initLng = parseFloat(initialCoords?.longitude) || 72.5714;
 
-  // Sanitize nearby reports for safe JSON injection
   const safeReports = (nearbyReports || []).map((r) => {
     if (!r.location || !r.location.latitude || !r.location.longitude) return null;
     return {
@@ -38,7 +35,7 @@ const LeafletLocationPicker = forwardRef(({
       const lat = parseFloat(latitude);
       const lng = parseFloat(longitude);
       if (!isNaN(lat) && !isNaN(lng) && webViewRef.current) {
-        const js = `if (window.setPickerLocation) { window.setPickerLocation(${lat}, ${lng}); } true;`;
+        const js = `window.setPickerLocation(${lat}, ${lng}); true;`;
         webViewRef.current.injectJavaScript(js);
       }
     }
@@ -50,26 +47,17 @@ const LeafletLocationPicker = forwardRef(({
       <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
         <style>
-          ${LEAFLET_CSS}
-          * { box-sizing: border-box; }
-          html, body {
+          html, body, #map {
             margin: 0;
             padding: 0;
             width: 100%;
             height: 100%;
+            background-color: #F5F0EB;
             overflow: hidden;
-            background-color: #F5F0EB;
-          }
-          #map {
-            position: absolute;
-            top: 0;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            width: 100%;
-            height: 100%;
-            background-color: #F5F0EB;
+            -webkit-user-select: none;
+            user-select: none;
           }
           .leaflet-control-zoom {
             border: 1px solid #E8E0D8 !important;
@@ -87,6 +75,9 @@ const LeafletLocationPicker = forwardRef(({
             cursor: pointer;
             filter: drop-shadow(0 4px 6px rgba(28,25,23,0.25));
             transition: transform 0.15s ease;
+          }
+          .amber-pin:active {
+            transform: scale(1.15);
           }
           .nearby-badge {
             width: 26px;
@@ -106,12 +97,10 @@ const LeafletLocationPicker = forwardRef(({
             border-radius: 50%;
           }
         </style>
-        <script>
-          ${LEAFLET_JS}
-        </script>
       </head>
       <body>
         <div id="map"></div>
+        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
         <script>
           (function() {
             try {
@@ -123,17 +112,11 @@ const LeafletLocationPicker = forwardRef(({
                 attributionControl: false
               });
 
-              // Primary tile layer: Google Maps roadmap
-              var tiles = L.tileLayer('https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
-                subdomains: ['0', '1', '2', '3'],
-                maxZoom: 20
-              });
-
-              tiles.on('tileerror', function() {
-                L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
-              });
-
-              tiles.addTo(map);
+              // Add CartoDB Voyager tiles (crisp, high-contrast, free & CORS enabled)
+              L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+                subdomains: 'abcd',
+                maxZoom: 19
+              }).addTo(map);
 
               // Draggable Amber Pin SVG
               var pinSvg = '<svg width="38" height="50" viewBox="0 0 38 50" fill="none" xmlns="http://www.w3.org/2000/svg">' +
@@ -181,7 +164,6 @@ const LeafletLocationPicker = forwardRef(({
                 sendCoords(e.latlng.lat, e.latlng.lng);
               });
 
-              // Add nearby reports
               var nearby = ${JSON.stringify(safeReports)};
               var nearbyIcon = L.divIcon({
                 html: '<div class="nearby-badge"><div class="nearby-dot"></div></div>',
@@ -204,23 +186,11 @@ const LeafletLocationPicker = forwardRef(({
                 sendCoords(lat, lng);
               };
 
-              // Force layout dimension updates
-              setTimeout(function() { map.invalidateSize(); }, 80);
-              setTimeout(function() { map.invalidateSize(); }, 300);
-              setTimeout(function() { map.invalidateSize(); }, 800);
-
-              window.addEventListener('resize', function() {
-                map.invalidateSize();
-              });
-
               if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
                 window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'MAP_READY' }));
               }
             } catch (err) {
               console.error('Picker init error:', err);
-              if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
-                window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'MAP_READY' }));
-              }
             }
           })();
         </script>
@@ -255,11 +225,6 @@ const LeafletLocationPicker = forwardRef(({
         showsVerticalScrollIndicator={false}
         javaScriptEnabled={true}
         domStorageEnabled={true}
-        mixedContentMode="always"
-        allowFileAccess={true}
-        cacheEnabled={true}
-        androidHardwareAccelerationDisabled={false}
-        androidLayerType="hardware"
         onMessage={handleMessage}
         onLoadEnd={() => setMapLoaded(true)}
         style={styles.webView}
@@ -284,8 +249,6 @@ const styles = StyleSheet.create({
   },
   webView: {
     flex: 1,
-    width: '100%',
-    height: '100%',
     backgroundColor: '#F5F0EB'
   },
   loadingOverlay: {
