@@ -1,31 +1,34 @@
 /**
  * @file location.jsx
  * @description Full-screen map location picker screen - Warm Stone & Amber civic super-app design.
- * Uses LeafletLocationPicker powered by CartoDB Voyager tiles for rock-solid Android compatibility.
+ * Uses 100% native MapView from react-native-maps for 60fps smooth panning, zooming, and dragging.
  */
 
-import React, { useEffect, useRef, useContext, useState } from 'react';
-import { View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
+import React, { useEffect, useRef, useContext, useState, useMemo } from 'react';
+import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import MapView, { Marker, Callout } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 
 import useLocation from '../hooks/useLocation';
 import { ReportContext } from '../context/ReportContext';
-import LeafletLocationPicker from '../components/LeafletLocationPicker';
+import { CategoryIcon } from '../constants/categories';
 
 // Default fallback coordinates (e.g. Ahmedabad, India)
 const DEFAULT_COORDS = {
   latitude: 23.0225,
-  longitude: 72.5714
+  longitude: 72.5714,
+  latitudeDelta: 0.015,
+  longitudeDelta: 0.015
 };
 
 export default function LocationPickerScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const { reports } = useContext(ReportContext);
-  const pickerRef = useRef(null);
+  const mapRef = useRef(null);
   const [isLocating, setIsLocating] = useState(false);
 
   const {
@@ -37,6 +40,13 @@ export default function LocationPickerScreen() {
     getCurrentLocation
   } = useLocation();
 
+  const [region, setRegion] = useState({
+    latitude: params.latitude ? parseFloat(params.latitude) : DEFAULT_COORDS.latitude,
+    longitude: params.longitude ? parseFloat(params.longitude) : DEFAULT_COORDS.longitude,
+    latitudeDelta: DEFAULT_COORDS.latitudeDelta,
+    longitudeDelta: DEFAULT_COORDS.longitudeDelta
+  });
+
   const activeCoords = location || {
     latitude: params.latitude ? parseFloat(params.latitude) : DEFAULT_COORDS.latitude,
     longitude: params.longitude ? parseFloat(params.longitude) : DEFAULT_COORDS.longitude
@@ -47,8 +57,15 @@ export default function LocationPickerScreen() {
       const res = await getCurrentLocation();
       if (res && res.coords) {
         setLocation(res.coords);
-        if (pickerRef.current) {
-          pickerRef.current.flyTo(res.coords.latitude, res.coords.longitude);
+        const newRegion = {
+          latitude: res.coords.latitude,
+          longitude: res.coords.longitude,
+          latitudeDelta: DEFAULT_COORDS.latitudeDelta,
+          longitudeDelta: DEFAULT_COORDS.longitudeDelta
+        };
+        setRegion(newRegion);
+        if (mapRef.current) {
+          mapRef.current.animateToRegion(newRegion, 800);
         }
       }
     };
@@ -87,8 +104,15 @@ export default function LocationPickerScreen() {
       const res = await getCurrentLocation();
       if (res && res.coords) {
         setLocation(res.coords);
-        if (pickerRef.current) {
-          pickerRef.current.flyTo(res.coords.latitude, res.coords.longitude);
+        const newRegion = {
+          latitude: res.coords.latitude,
+          longitude: res.coords.longitude,
+          latitudeDelta: DEFAULT_COORDS.latitudeDelta,
+          longitudeDelta: DEFAULT_COORDS.longitudeDelta
+        };
+        setRegion(newRegion);
+        if (mapRef.current) {
+          mapRef.current.animateToRegion(newRegion, 800);
         }
       }
     } finally {
@@ -110,6 +134,47 @@ export default function LocationPickerScreen() {
     });
   };
 
+  const nearbyIssueMarkers = useMemo(() => {
+    return (reports || []).map((rep) => {
+      if (!rep.location || !rep.location.latitude || !rep.location.longitude) return null;
+      const rLat = parseFloat(rep.location.latitude);
+      const rLng = parseFloat(rep.location.longitude);
+      if (isNaN(rLat) || isNaN(rLng)) return null;
+
+      return (
+        <Marker
+          key={`nearby_${rep._id}`}
+          coordinate={{ latitude: rLat, longitude: rLng }}
+          opacity={0.85}
+          tracksViewChanges={false}
+        >
+          <View
+            className="bg-surface border border-cardBorder w-8 h-8 rounded-xl items-center justify-center"
+            style={{
+              shadowColor: '#1C1917',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.1,
+              shadowRadius: 3,
+              elevation: 2
+            }}
+          >
+            <CategoryIcon categoryId={rep.category} size={16} color="#F97316" />
+          </View>
+          <Callout tooltip={false}>
+            <View style={{ padding: 8, width: 160, backgroundColor: '#FDFAF7', borderRadius: 12, borderWidth: 1, borderColor: '#E8E0D8' }}>
+              <Text style={{ fontSize: 12, fontWeight: '700', color: '#1C1917' }} numberOfLines={1}>
+                {String(rep.title || 'Civic Issue')}
+              </Text>
+              <Text style={{ fontSize: 10, color: '#F97316', fontWeight: '700', marginTop: 2 }}>
+                Existing Report
+              </Text>
+            </View>
+          </Callout>
+        </Marker>
+      );
+    }).filter(Boolean);
+  }, [reports]);
+
   const renderConfirmButtonText = loading ? (
     <ActivityIndicator size="small" color="#FFFFFF" />
   ) : (
@@ -130,12 +195,26 @@ export default function LocationPickerScreen() {
 
       {/* Map Area */}
       <View style={{ flex: 1 }} className="flex-1 bg-surface relative">
-        <LeafletLocationPicker
-          ref={pickerRef}
-          initialCoords={activeCoords}
-          onLocationChange={handleLocationChange}
-          nearbyReports={reports}
-        />
+        <MapView
+          ref={mapRef}
+          style={StyleSheet.absoluteFillObject}
+          region={region}
+          onRegionChangeComplete={setRegion}
+          showsUserLocation={true}
+          showsMyLocationButton={false}
+          onPress={(e) => handleLocationChange(e.nativeEvent.coordinate)}
+        >
+          {nearbyIssueMarkers}
+          
+          <Marker
+            coordinate={activeCoords}
+            draggable
+            onDragEnd={(e) => handleLocationChange(e.nativeEvent.coordinate)}
+            title="Tagged Location"
+            description={address || 'Drag to fine-tune position'}
+            pinColor="#F97316"
+          />
+        </MapView>
 
         <TouchableOpacity
           onPress={handleSnapToCurrent}
@@ -170,7 +249,7 @@ export default function LocationPickerScreen() {
       >
         <Text className="text-textMuted text-xs font-semibold uppercase tracking-wider mb-1">Detected Address</Text>
         <Text numberOfLines={2} className="text-textDark font-medium text-sm mb-4 h-10 leading-5">
-          {address || 'Locating GPS... drag marker pin to adjust'}
+          {address || 'Locating GPS... drag marker pin or tap to adjust'}
         </Text>
 
         <TouchableOpacity

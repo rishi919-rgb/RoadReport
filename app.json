@@ -12,6 +12,11 @@
     },
     "android": {
       "package": "com.rishi919.roadreport",
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyRoadReportDefaultKeyForVivaAndOffline"
+        }
+      },
       "permissions": [
         "INTERNET",
         "ACCESS_COARSE_LOCATION",
